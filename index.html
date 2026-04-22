@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoomOS Macro Simulator</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@momentum-ui/icons@8.33.0/css/momentum-ui-icons.min.css"
+    />
+    <link
+      rel="stylesheet"
+      data-name="vs/editor/editor.main"
+      href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.min.css"
+    />
+  
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>RoomOS Macro Simulator</h1>
+          <p class="topbar-warning">Work in progress POC. Features and UI may change.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="load-sample-button" class="ghost-button">Load Sample Macro</button>
+          <button id="run-button" class="primary-button">Run Enabled Macros</button>
+          <label class="topbar-select-shell" for="product-select">
+            <span class="sr-only">Select product</span>
+            <select id="product-select" class="topbar-select" aria-label="Select product"></select>
+          </label>
+        </div>
+      </header>
+
+      <main id="workspace" class="workspace">
+        <section id="files-panel" class="panel files-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Macros</p>
+            </div>
+          </div>
+
+          <div class="files-actions">
+            <label class="file-action-card upload-button">
+              <input id="file-input" type="file" accept=".js,.mjs,.txt" multiple />
+              <span>Import from file...</span>
+            </label>
+            <button id="new-file-button" class="file-action-card" type="button">Create new macro</button>
+          </div>
+
+          <div id="file-list" class="file-list"></div>
+
+         
+        </section>
+
+        <div
+          id="files-editor-resizer"
+          class="panel-resizer panel-resizer-horizontal"
+          role="separator"
+          aria-label="Resize macros and editor panels"
+          aria-orientation="vertical"
+        ></div>
+
+        <section id="editor-panel" class="panel editor-panel">
+          <div class="panel-header slim">
+            <div>
+              <p class="panel-kicker">Macro Editor</p>
+            </div>
+          </div>
+
+          <div id="editor-surface" class="editor-surface">
+            <div id="code-editor" class="code-editor" aria-label="Macro code editor"></div>
+          </div>
+          <div
+            id="editor-console-resizer"
+            class="panel-resizer panel-resizer-vertical"
+            role="separator"
+            aria-label="Resize editor and runtime log"
+            aria-orientation="horizontal"
+          ></div>
+          <section id="runtime-console" class="runtime-console">
+            <div class="console-header">
+              <div class="log-toolbar">
+                <div class="log-filter-group">
+                  <div class="severity-menu-shell">
+                    <button
+                      id="log-severity-button"
+                      class="log-toolbar-button"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                    >
+                      Severity <i class="fa fa-caret-down" aria-hidden="true"></i>
+                    </button>
+                    <div id="log-severity-menu" class="severity-menu" role="menu" hidden>
+                      <button type="button" class="severity-menu-item reset" data-log-level-reset="true" role="menuitem">
+                        Default
+                      </button>
+                      <div class="severity-menu-divider"></div>
+                      <button type="button" class="severity-menu-item" data-log-level="error" role="menuitemcheckbox" aria-checked="true">
+                        <span>Error</span>
+                        <i class="fa fa-check" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="severity-menu-item" data-log-level="warn" role="menuitemcheckbox" aria-checked="true">
+                        <span>Warn</span>
+                        <i class="fa fa-check" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="severity-menu-item" data-log-level="info" role="menuitemcheckbox" aria-checked="true">
+                        <span>Info</span>
+                        <i class="fa fa-check" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="severity-menu-item" data-log-level="log" role="menuitemcheckbox" aria-checked="true">
+                        <span>Log</span>
+                        <i class="fa fa-check" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="severity-menu-item" data-log-level="debug" role="menuitemcheckbox" aria-checked="true">
+                        <span>Debug</span>
+                        <i class="fa fa-check" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <label class="log-filter-input-shell" for="log-filter-input">
+                    <span class="sr-only">Filter log output</span>
+                    <input
+                      id="log-filter-input"
+                      class="log-filter-input"
+                      type="text"
+                      placeholder="Enter filter"
+                      autocomplete="off"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div id="log-output" class="log-output"></div>
+          </section>
+        </section>
+
+        <div
+          id="editor-simulator-resizer"
+          class="panel-resizer panel-resizer-horizontal"
+          role="separator"
+          aria-label="Resize editor and simulator panels"
+          aria-orientation="vertical"
+        ></div>
+
+        <section id="simulator-panel" class="panel simulator-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Simulator</p>
+            </div>
+            <button id="reset-button" class="panel-action">Reset Device State</button>
+          </div>
+
+          <div id="device-render-root" class="device-render-root"></div>
+
+      </main>
+    </div>
+
+    <div id="help-overlay" class="help-overlay hidden" aria-hidden="true">
+      <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <div class="help-header">
+          <div>
+            <p class="panel-kicker">Keyboard Shortcuts</p>
+            <h2 id="help-title">Macro Editor Shortcuts</h2>
+          </div>
+          <button id="close-help-button" class="panel-action" type="button">Close</button>
+        </div>
+        <div class="help-grid">
+          <div class="help-row"><span>`Meta + S` / `Meta + Enter`</span><span>Save current macro to device and restart runtime</span></div>
+          <div class="help-row"><span>`Meta + E`</span><span>Export current macro to file</span></div>
+          <div class="help-row"><span>`Meta + O`</span><span>Import from file</span></div>
+          <div class="help-row"><span>`Meta + Shift + N`</span><span>Create new macro</span></div>
+          <div class="help-row"><span>`Meta + Shift + H`</span><span>Toggle help</span></div>
+          <div class="help-row"><span>`Meta + Shift + G`</span><span>Toggle log</span></div>
+          <div class="help-row"><span>`Meta + Shift + M`</span><span>Toggle macro sidebar</span></div>
+          <div class="help-row"><span>`Ctrl + Space`</span><span>Auto-complete in Monaco</span></div>
+          <div class="help-row"><span>`Meta + Z` / `Meta + Shift + Z`</span><span>Undo / Redo in Monaco</span></div>
+          <div class="help-row"><span>`Meta + F`</span><span>Search in Monaco</span></div>
+          <div class="help-row"><span>`Meta + /`</span><span>Toggle comment in Monaco</span></div>
+          <div class="help-row"><span>`Tab` / `Shift + Tab`</span><span>Indent / un-indent in Monaco</span></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/loader.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

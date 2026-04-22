@@ -1,0 +1,27 @@
+import xapi from 'xapi';
+
+xapi.Command.UserInterface.Message.Alert.Display({
+  Title: 'Welcome to the simulator',
+  Text: 'Your RoomOS macro is running in the browser.',
+});
+
+xapi.Command.UserInterface.Extensions.Panel.Save({
+  PanelId: 'lighting',
+  Name: 'Lighting Scene',
+  ActivityType: 'Custom',
+});
+
+xapi.Command.UserInterface.Extensions.Panel.Open({
+  PanelId: 'lighting',
+});
+
+xapi.Command.RoomScheduler.Configure({
+  Title: 'Design Review',
+  Subtitle: '11:00 - 11:45',
+  NextMeeting: 'Client Debrief at 14:00',
+  Presenter: 'Aisling Chen',
+  Progress: 58,
+  Busy: true,
+});
+
+console.log('Macro executed in simulator');

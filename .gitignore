@@ -26,6 +26,7 @@
 # visualstudio
 
 
+.vscode/
 
 ### Android ###
 # Gradle files

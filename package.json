@@ -1,0 +1,24 @@
+{
+  "name": "roomos-macro-simulator",
+  "version": "1.0.0",
+  "description": "single-page application for experimenting with Cisco RoomOS-style macros without needing physical hardware or a backend service",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test:e2e:install": "playwright install",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.3"
+  },
+  "keywords": [
+    "roomos",
+    "macros",
+    "collaboration"
+  ],
+  "author": "William Mills",
+  "license": "MIT"
+}
