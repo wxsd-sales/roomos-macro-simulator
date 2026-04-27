@@ -479,9 +479,29 @@ body.is-resizing {
   transform: translateX(16px);
 }
 
-.icon-flip-horizontal {
-  display: inline-block;
-  transform: scaleX(-1);
+.momentum-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  line-height: 1;
+}
+
+.momentum-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.momentum-icon svg [fill]:not([fill="none"]) {
+  fill: currentColor;
+}
+
+.momentum-icon svg [stroke]:not([stroke="none"]) {
+  stroke: currentColor;
 }
 
 .panel-footer {
@@ -650,14 +670,14 @@ body.is-resizing {
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
 }
 
-.osd-airplay-status {
+.osd-status-item {
   display: inline-flex;
   align-items: center;
   gap: clamp(5px, 1cqi, 8px);
   font-size: clamp(0.65rem, 1.65cqi, 0.94rem);
 }
 
-.osd-airplay-icon {
+.osd-status-icon {
   width: clamp(0.85rem, 2.2cqi, 1.1rem);
   height: clamp(0.85rem, 2.2cqi, 1.1rem);
   display: inline-flex;
@@ -665,7 +685,7 @@ body.is-resizing {
   justify-content: center;
 }
 
-.osd-airplay-icon svg {
+.osd-status-icon svg {
   width: 100%;
   height: 100%;
 }
@@ -703,8 +723,8 @@ body.is-resizing {
   width: clamp(46px, 10.8cqi, 74px);
   aspect-ratio: 1;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(5, 10, 22, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(5, 10, 22, 0.62);
   color: #fff;
   display: grid;
   place-items: center;
@@ -712,8 +732,8 @@ body.is-resizing {
 }
 
 .osd-action-button.active {
-  background: linear-gradient(180deg, #1d8be4, #1079cf);
-  border-color: rgba(141, 211, 255, 0.45);
+  background: rgba(5, 10, 22, 0.62);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .osd-action-icon {
@@ -724,9 +744,9 @@ body.is-resizing {
   justify-content: center;
 }
 
-.osd-action-icon .icon {
-  font-size: clamp(0.92rem, 3cqi, 1.4rem);
-  line-height: 1;
+.osd-action-icon .momentum-icon {
+  width: 100%;
+  height: 100%;
 }
 
 .osd-action-icon svg {
@@ -987,7 +1007,7 @@ body.is-resizing {
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(5, 10, 22, 0.44);
+  background: rgba(5, 10, 22, 0.62);
   color: #fff;
   display: grid;
   place-items: center;
@@ -995,8 +1015,8 @@ body.is-resizing {
 }
 
 .controller-action-button.active {
-  background: linear-gradient(180deg, #1d8be4, #1079cf);
-  border-color: rgba(141, 211, 255, 0.45);
+  background: rgba(5, 10, 22, 0.62);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .controller-action-icon {
@@ -1007,9 +1027,9 @@ body.is-resizing {
   justify-content: center;
 }
 
-.controller-action-icon .icon {
-  font-size: clamp(0.92rem, 3cqi, 1.4rem);
-  line-height: 1;
+.controller-action-icon .momentum-icon {
+  width: 100%;
+  height: 100%;
 }
 
 .controller-action-icon svg,
@@ -1190,9 +1210,9 @@ body.is-resizing {
   place-items: center;
 }
 
-.scheduler-room-icon .icon {
-  font-size: clamp(0.95rem, 3.4cqi, 1.55rem);
-  line-height: 1;
+.scheduler-room-icon .momentum-icon {
+  width: clamp(1.1rem, 3.9cqi, 1.9rem);
+  height: clamp(1.1rem, 3.9cqi, 1.9rem);
 }
 
 .scheduler-device-name-row {
@@ -1245,8 +1265,9 @@ body.is-resizing {
   place-items: center;
 }
 
-.scheduler-custom-icon .icon {
-  font-size: clamp(1rem, 3.4cqi, 1.45rem);
+.scheduler-custom-icon .momentum-icon {
+  width: clamp(1rem, 3.4cqi, 1.45rem);
+  height: clamp(1rem, 3.4cqi, 1.45rem);
 }
 
 .scheduler-custom-label {
@@ -1320,10 +1341,10 @@ body.is-resizing {
   color: #fff;
 }
 
-.scheduler-primary-action .icon,
-.scheduler-secondary-action .icon {
-  font-size: clamp(0.92rem, 2cqi, 1.08rem);
-  line-height: 1;
+.scheduler-primary-action .momentum-icon,
+.scheduler-secondary-action .momentum-icon {
+  width: clamp(0.92rem, 2cqi, 1.08rem);
+  height: clamp(0.92rem, 2cqi, 1.08rem);
 }
 
 @container (max-width: 620px) {

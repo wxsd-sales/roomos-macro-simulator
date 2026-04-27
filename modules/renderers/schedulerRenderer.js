@@ -1,3 +1,5 @@
+import { icon } from "../icons.js";
+
 function formatSchedulerTime(date) {
   return date.toLocaleTimeString([], {
     hour: "numeric",
@@ -13,7 +15,7 @@ export function createSchedulerRenderer({ root }) {
           <div class="scheduler-left-column">
           <div class="scheduler-room-panel">
             <div class="scheduler-room-icon" aria-hidden="true">
-              <i class="icon icon-webex-teams_16"></i>
+              ${icon("webexTeams")}
             </div>
               <div class="scheduler-device-name-row">
                 <div data-scheduler-device-name class="scheduler-device-name">Workspace Name</div>
@@ -23,7 +25,7 @@ export function createSchedulerRenderer({ root }) {
             <div class="scheduler-custom-panel">
               <button class="scheduler-custom-tile" type="button">
                 <span class="scheduler-custom-icon" aria-hidden="true">
-                  <i class="icon icon-laptop_16"></i>
+                  ${icon("laptop")}
                 </span>
                 <span class="scheduler-custom-label">Custom button</span>
               </button>
@@ -36,11 +38,11 @@ export function createSchedulerRenderer({ root }) {
               <div data-booking-state class="scheduler-availability-text">Available</div>
               <div class="scheduler-action-stack">
                 <button class="scheduler-primary-action" type="button">
-                  <i class="icon icon-calendar-add_16" aria-hidden="true"></i>
+                  ${icon("calendarAdd")}
                   <span>Book room</span>
                 </button>
                 <button class="scheduler-secondary-action" type="button">
-                  <i class="icon icon-calendar-empty_16" aria-hidden="true"></i>
+                  ${icon("calendarEmpty")}
                   <span>Room calendar</span>
                 </button>
               </div>

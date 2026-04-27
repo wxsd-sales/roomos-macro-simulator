@@ -1,3 +1,5 @@
+import { icon } from "../icons.js";
+
 const NATIVE_ACTIONS = [
   { id: "native-call", label: "Call", icon: "call" },
   { id: "native-whiteboard", label: "Whiteboard", icon: "whiteboard" },
@@ -18,11 +20,11 @@ function escapeHtml(text) {
 function getActionIconMarkup(action) {
   switch (action.icon) {
     case "call":
-      return `<i class="icon icon-camera_16" aria-hidden="true"></i>`;
+      return icon("camera");
     case "whiteboard":
-      return `<i class="icon icon-whiteboard_16" aria-hidden="true"></i>`;
+      return icon("whiteboard");
     case "share":
-      return `<i class="icon icon-content-share_16" aria-hidden="true"></i>`;
+      return icon("contentShare");
     case "webex":
       return `
         <img
@@ -33,7 +35,7 @@ function getActionIconMarkup(action) {
         />
       `;
     case "files":
-      return `<i class="icon icon-files_16" aria-hidden="true"></i>`;
+      return icon("files");
     case "zoom":
       return `
         <img
@@ -73,13 +75,13 @@ export function createOsdRenderer({ root, onDismissAlert }) {
             <span class="osd-workspace-chevron" aria-hidden="true">›</span>
           </button>
           <div class="osd-statusbar">
-            <span class="osd-airplay-status" aria-hidden="true">
-              <span class="osd-airplay-icon">
-                <svg viewBox="0 0 20 20">
-                  <path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5V11h-1.8V4.5a.7.7 0 0 0-.7-.7h-9a.7.7 0 0 0-.7.7V11H3V4.5Zm7 6.4 3.3 4.1H6.7l3.3-4.1Zm-5.8 4.9h11.6v1.2H4.2v-1.2Z" fill="currentColor"/>
-                </svg>
-              </span>
+            <span class="osd-status-item" aria-hidden="true">
+              ${icon("airplay", "momentum-icon osd-status-icon")}
               <span>AirPlay</span>
+            </span>
+            <span class="osd-status-item" aria-hidden="true">
+              ${icon("deviceConnection", "momentum-icon osd-status-icon")}
+              <span>Miracast</span>
             </span>
             <span data-device-clock class="osd-clock">22:57</span>
           </div>

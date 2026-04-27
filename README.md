@@ -4,6 +4,8 @@
 
 `RoomOS Macro Simulator` is a browser-based simulator for experimenting with RoomOS-style macros without needing physical Cisco devices. It provides a local macro editor, runtime log viewer, and simulated device surfaces for the on-screen display, controller UI, and room scheduler UI.
 
+![RoomOS Macro Simulator screenshot](images/readme-screenshot.png)
+
 ## Overview
 
 This project is a static web application powered by Vite and plain JavaScript modules. Macro files are loaded into the Monaco editor, executed in-browser against a simulated `xapi` facade, and then reflected into the UI renderers that model RoomOS device surfaces.
@@ -84,6 +86,16 @@ Run end-to-end tests:
 ```bash
 npm run test:e2e
 ```
+
+## README Screenshot
+
+Generate the screenshot used in this README:
+
+```bash
+npm run screenshot:readme
+```
+
+By default this starts a local Vite server, runs the bundled sample macro, and writes `images/readme-screenshot.png`. CI can override the capture target or output path with `README_SCREENSHOT_URL` and `README_SCREENSHOT_OUTPUT`.
 
 ## License
 

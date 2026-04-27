@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="./styles.css" />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@momentum-ui/icons@8.33.0/css/momentum-ui-icons.min.css"
-    />
-    <link
-      rel="stylesheet"
       data-name="vs/editor/editor.main"
       href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.min.css"
     />
@@ -91,7 +87,7 @@
                       aria-haspopup="menu"
                       aria-expanded="false"
                     >
-                      Severity <i class="fa fa-caret-down" aria-hidden="true"></i>
+                      Severity <span data-momentum-icon="arrowTriangleDown"></span>
                     </button>
                     <div id="log-severity-menu" class="severity-menu" role="menu" hidden>
                       <button type="button" class="severity-menu-item reset" data-log-level-reset="true" role="menuitem">
@@ -100,23 +96,23 @@
                       <div class="severity-menu-divider"></div>
                       <button type="button" class="severity-menu-item" data-log-level="error" role="menuitemcheckbox" aria-checked="true">
                         <span>Error</span>
-                        <i class="fa fa-check" aria-hidden="true"></i>
+                        <span data-momentum-icon="check"></span>
                       </button>
                       <button type="button" class="severity-menu-item" data-log-level="warn" role="menuitemcheckbox" aria-checked="true">
                         <span>Warn</span>
-                        <i class="fa fa-check" aria-hidden="true"></i>
+                        <span data-momentum-icon="check"></span>
                       </button>
                       <button type="button" class="severity-menu-item" data-log-level="info" role="menuitemcheckbox" aria-checked="true">
                         <span>Info</span>
-                        <i class="fa fa-check" aria-hidden="true"></i>
+                        <span data-momentum-icon="check"></span>
                       </button>
                       <button type="button" class="severity-menu-item" data-log-level="log" role="menuitemcheckbox" aria-checked="true">
                         <span>Log</span>
-                        <i class="fa fa-check" aria-hidden="true"></i>
+                        <span data-momentum-icon="check"></span>
                       </button>
                       <button type="button" class="severity-menu-item" data-log-level="debug" role="menuitemcheckbox" aria-checked="true">
                         <span>Debug</span>
-                        <i class="fa fa-check" aria-hidden="true"></i>
+                        <span data-momentum-icon="check"></span>
                       </button>
                     </div>
                   </div>

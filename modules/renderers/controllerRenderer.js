@@ -1,3 +1,5 @@
+import { icon } from "../icons.js";
+
 function escapeHtml(text) {
   return String(text ?? "")
     .replaceAll("&", "&amp;")
@@ -26,9 +28,9 @@ function formatControllerDate(date) {
 function getActionIconMarkup(action) {
   switch (action.icon) {
     case "call":
-      return `<i class="icon icon-camera_16" aria-hidden="true"></i>`;
+      return icon("camera");
     case "share":
-      return `<i class="icon icon-content-share_16" aria-hidden="true"></i>`;
+      return icon("contentShare");
     case "webex":
       return `
         <img
@@ -48,7 +50,7 @@ function getActionIconMarkup(action) {
         />
       `;
     case "sliders":
-      return `<i class="icon icon-adjust_16" aria-hidden="true"></i>`;
+      return icon("adjust");
     default:
       return `
         <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -104,11 +106,11 @@ export function createControllerRenderer({ root, onSelectPanel }) {
 
         <div class="controller-volume-panel" aria-hidden="true">
           <button class="controller-volume-button" type="button" tabindex="-1">
-            <span class="controller-volume-icon"><i class="icon icon-speaker-turn-down_16" aria-hidden="true"></i></span>
+            <span class="controller-volume-icon">${icon("speakerTurnDown")}</span>
             <span class="sr-only">Volume down</span>
           </button>
           <button class="controller-volume-button" type="button" tabindex="-1">
-            <span class="controller-volume-icon"><i class="icon icon-speaker-turn-up_16" aria-hidden="true"></i></span>
+            <span class="controller-volume-icon">${icon("speakerTurnUp")}</span>
             <span class="sr-only">Volume up</span>
           </button>
         </div>

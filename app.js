@@ -1,4 +1,5 @@
 import { initializeMonacoEditor } from "./modules/monacoEditor.js";
+import { hydrateIcons, icon } from "./modules/icons.js";
 import { products } from "./modules/productHelper.js";
 import { createDeviceRenderer } from "./modules/renderers/deviceRenderer.js";
 import { createXapiFacade } from "./modules/xapiFacade.js";
@@ -23,6 +24,7 @@ let monacoEditor = null;
 let monacoReady = null;
 let isApplyingEditorState = false;
 let activeResizeCleanup = null;
+let activeEditorFileId = null;
 
 const DESKTOP_LAYOUT_MEDIA_QUERY = "(min-width: 1160px)";
 const HORIZONTAL_RESIZER_SIZE = 18;
@@ -126,6 +128,10 @@ function createFile(name, content = "") {
 
 function getActiveFile() {
   return state.files.find((file) => file.id === state.activeFileId) ?? null;
+}
+
+function getFileById(fileId) {
+  return state.files.find((file) => file.id === fileId) ?? null;
 }
 
 function addLog(message, level = "info") {
@@ -259,17 +265,19 @@ function isFileDirty(file) {
 }
 
 function closeFileMenu() {
-  if (state.openFileMenuId === null) {
+  const openFileMenuId = state.openFileMenuId;
+  if (openFileMenuId === null) {
     return;
   }
   state.openFileMenuId = null;
-  renderFiles();
+  updateFileListItemById(openFileMenuId);
+  renderFloatingFileMenu();
 }
 
 function toggleFileEnabled(file) {
   file.enabled = !file.enabled;
   addLog(`${file.enabled ? "Enabled" : "Disabled"} ${file.name}`, "success");
-  renderFiles();
+  updateFileListItem(file);
 }
 
 function renameFile(file) {
@@ -305,13 +313,14 @@ function saveFileToDisk(file) {
   URL.revokeObjectURL(url);
   state.openFileMenuId = null;
   addLog(`Saved ${file.name} to file.`, "success");
-  renderFiles();
+  updateFileListItem(file);
+  renderFloatingFileMenu();
 }
 
 function saveFileToDevice(file) {
   file.deviceContent = file.content;
   addLog(`Saved ${file.name} to simulated device.`, "success");
-  renderFiles();
+  updateFileListItem(file);
 }
 
 function getOpenFileMenuButton() {
@@ -456,31 +465,15 @@ function renderVisibilityState() {
   applyEditorLayout();
 }
 
-function renderFiles() {
-  els.fileList.innerHTML = "";
-
-  if (!state.files.length) {
-    const emptyState = document.createElement("div");
-    emptyState.className = "file-item";
-    emptyState.innerHTML = `
-      <strong class="file-name">No macros yet</strong>
-      <div></div>
-      <div></div>
-    `;
-    els.fileList.append(emptyState);
-    return;
-  }
-
-  state.files.forEach((file) => {
-    const item = document.createElement("div");
-    item.className = `file-item ${file.id === state.activeFileId ? "active" : ""}`;
-    item.innerHTML = `
+function getFileItemMarkup(file) {
+  return `
+    <div class="file-item ${file.id === state.activeFileId ? "active" : ""}" data-file-id="${file.id}">
       <strong class="file-name">${escapeHtml(getDisplayFileName(file.name))}</strong>
       ${
         isFileDirty(file)
           ? `
             <button class="file-save-button" type="button" aria-label="Save ${escapeHtml(file.name)} to simulated device">
-              <i class="icon icon-save_16" aria-hidden="true"></i>
+              ${icon("save")}
             </button>
           `
           : '<div class="file-save-spacer"></div>'
@@ -493,38 +486,50 @@ function renderFiles() {
         aria-expanded="${file.id === state.openFileMenuId ? "true" : "false"}"
         aria-label="File actions for ${escapeHtml(file.name)}"
       >
-        <i class="icon icon-tools_16" aria-hidden="true"></i>
+        ${icon("tools")}
       </button>
       <input class="file-toggle" type="checkbox" ${file.enabled ? "checked" : ""} aria-label="${file.enabled ? "Disable" : "Enable"} ${file.name}" />
+    </div>
+  `;
+}
+
+function updateFileListItem(file) {
+  const item = els.fileList.querySelector(`.file-item[data-file-id="${file.id}"]`);
+  if (!item) {
+    return;
+  }
+
+  item.outerHTML = getFileItemMarkup(file);
+
+  if (state.openFileMenuId === file.id) {
+    renderFloatingFileMenu();
+  }
+}
+
+function updateFileListItemById(fileId) {
+  const file = getFileById(fileId);
+  if (file) {
+    updateFileListItem(file);
+    return;
+  }
+
+  renderFiles();
+}
+
+function renderFiles() {
+  if (!state.files.length) {
+    els.fileList.innerHTML = `
+      <div class="file-item">
+        <strong class="file-name">No macros yet</strong>
+        <div></div>
+        <div></div>
+      </div>
     `;
+    renderFloatingFileMenu();
+    return;
+  }
 
-    item.addEventListener("click", () => {
-      state.activeFileId = file.id;
-      state.openFileMenuId = null;
-      render();
-    });
-
-    item.querySelector(".file-toggle").addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleFileEnabled(file);
-    });
-
-    const saveButton = item.querySelector(".file-save-button");
-    if (saveButton) {
-      saveButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        saveFileToDevice(file);
-      });
-    }
-
-    item.querySelector(".file-menu-button").addEventListener("click", (event) => {
-      event.stopPropagation();
-      state.openFileMenuId = state.openFileMenuId === file.id ? null : file.id;
-      renderFiles();
-    });
-
-    els.fileList.append(item);
-  });
+  els.fileList.innerHTML = state.files.map(getFileItemMarkup).join("");
 
   renderFloatingFileMenu();
 }
@@ -536,10 +541,19 @@ function renderEditor() {
     return;
   }
 
+  const nextEditorFileId = activeFile?.id ?? null;
+  const nextEditorValue = activeFile?.content ?? "";
+  const shouldSyncEditorValue =
+    activeEditorFileId !== nextEditorFileId ||
+    monacoEditor.getValue() !== nextEditorValue;
+
   isApplyingEditorState = true;
   monacoEditor.updateOptions({ readOnly: !activeFile });
-  monacoEditor.setValue(activeFile?.content ?? "");
+  if (shouldSyncEditorValue) {
+    monacoEditor.setValue(nextEditorValue);
+  }
   isApplyingEditorState = false;
+  activeEditorFileId = nextEditorFileId;
 
   // Monaco can fail to repaint correctly after panel/header layout changes unless
   // we explicitly ask it to recalculate its dimensions on the next frame.
@@ -908,9 +922,14 @@ function initializeMonaco() {
       }
 
       activeFile.content = monacoEditor.getValue();
-      renderFiles();
+      updateFileListItem(activeFile);
     },
-    onBlur: () => renderFiles(),
+    onBlur: () => {
+      const activeFile = getActiveFile();
+      if (activeFile) {
+        updateFileListItem(activeFile);
+      }
+    },
   }).then((editor) => {
     monacoEditor = editor;
     renderEditor();
@@ -981,6 +1000,7 @@ function handleGlobalShortcuts(event) {
 }
 
 els.fileInput.addEventListener("change", handleFileUpload);
+hydrateIcons();
 initializeProductSelect();
 els.newFileButton.addEventListener("click", createNewFile);
 els.loadSampleButton.addEventListener("click", loadSampleMacro);
@@ -1008,6 +1028,70 @@ els.logSeverityMenu.addEventListener("click", (event) => {
   }
 
   toggleLogSeverityFilter(item.dataset.logLevel);
+});
+els.fileList.addEventListener("click", (event) => {
+  if (event.target.closest(".file-toggle")) {
+    return;
+  }
+
+  const saveButton = event.target.closest(".file-save-button");
+  if (saveButton) {
+    const item = saveButton.closest(".file-item[data-file-id]");
+    const file = getFileById(item?.dataset.fileId);
+    if (file) {
+      saveFileToDevice(file);
+    }
+    return;
+  }
+
+  const menuButton = event.target.closest(".file-menu-button");
+  if (menuButton) {
+    const fileId = menuButton.dataset.fileId;
+    const previousOpenFileMenuId = state.openFileMenuId;
+    state.openFileMenuId = previousOpenFileMenuId === fileId ? null : fileId;
+    if (previousOpenFileMenuId) {
+      updateFileListItemById(previousOpenFileMenuId);
+    }
+    if (state.openFileMenuId) {
+      updateFileListItemById(state.openFileMenuId);
+    } else {
+      renderFloatingFileMenu();
+    }
+    return;
+  }
+
+  const item = event.target.closest(".file-item[data-file-id]");
+  if (!item) {
+    return;
+  }
+
+  const nextActiveFileId = item.dataset.fileId;
+  const previousActiveFileId = state.activeFileId;
+  const previousOpenFileMenuId = state.openFileMenuId;
+
+  state.activeFileId = nextActiveFileId;
+  state.openFileMenuId = null;
+
+  if (previousActiveFileId && previousActiveFileId !== nextActiveFileId) {
+    updateFileListItemById(previousActiveFileId);
+  }
+  updateFileListItemById(nextActiveFileId);
+  if (previousOpenFileMenuId) {
+    renderFloatingFileMenu();
+  }
+  renderEditor();
+});
+els.fileList.addEventListener("change", (event) => {
+  const toggle = event.target.closest(".file-toggle");
+  if (!toggle) {
+    return;
+  }
+
+  const item = toggle.closest(".file-item[data-file-id]");
+  const file = getFileById(item?.dataset.fileId);
+  if (file) {
+    toggleFileEnabled(file);
+  }
 });
 els.logFilterInput.addEventListener("input", (event) => {
   state.logFilterText = event.target.value;
