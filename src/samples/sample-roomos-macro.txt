@@ -1,0 +1,39 @@
+import xapi from 'xapi';
+
+xapi.Command.UserInterface.Message.Alert.Display({
+  Title: 'Welcome to the simulator',
+  Text: 'Your RoomOS macro is running in the browser.',
+});
+
+const xml = `
+<Extensions>
+  <Panel>
+    <Location>HomeScreen</Location>
+    <Icon>Lightbulb</Icon>
+    <Name>Toggle Lights</Name>
+    <ActivityType>Custom</ActivityType>
+  </Panel>
+</Extensions>`;
+
+xapi.Command.UserInterface.Extensions.Panel.Save({ PanelId: 'lights'}, xml );
+
+xapi.Event.UserInterface.Extensions.Panel.Clicked.on(event => {
+  const { PanelId, Origin, PeripheralId } = event; 
+  if( PanelId != 'lights' ) return
+  console.log('Toggling Lights');
+});
+
+
+
+xapi.Command.Bookings.Book({ 
+  Duration: 30,
+  MeetingPlatform: 'Webex',
+  Number: '123456789@webex.com',
+  OrganizerEmail: 'user@example.com',
+  OrganizerName: 'Example User',
+  Protocol: 'Spark',
+  Title: 'Example Meeting'
+});
+
+
+console.log('Macro executed in simulator');

@@ -4,24 +4,77 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RoomOS Macro Simulator</title>
-    <link rel="stylesheet" href="./styles.css" />
-    <link
-      rel="stylesheet"
-      data-name="vs/editor/editor.main"
-      href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.min.css"
-    />
-  
+    <script>
+      (() => {
+        const storageKey = "roomos-macro-simulator-theme";
+        const getStoredPreference = () => {
+          try {
+            const value = localStorage.getItem(storageKey);
+            return value === "light" || value === "dark" ? value : "system";
+          } catch {
+            return "system";
+          }
+        };
+        const preference = getStoredPreference();
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        const theme = preference === "system" ? systemTheme : preference;
+        document.documentElement.classList.add(
+          theme === "dark" ? "mds-theme-stable-darkWebex" : "mds-theme-stable-lightWebex",
+        );
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.themePreference = preference;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <button
+          id="macro-sidebar-toggle-button"
+          class="topbar-menu-button"
+          type="button"
+          aria-label="Toggle macros panel"
+          aria-controls="files-panel"
+          aria-pressed="true"
+        >
+          <span data-momentum-icon="listMenu"></span>
+        </button>
+        <div class="topbar-title">
           <h1>RoomOS Macro Simulator</h1>
-          <p class="topbar-warning">Work in progress POC. Features and UI may change.</p>
         </div>
         <div class="topbar-actions">
+          <div id="theme-select-shell" class="theme-select-shell">
+            <button
+              id="theme-select-button"
+              class="theme-select-button"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span id="theme-select-current-icon" class="theme-select-current-icon" aria-hidden="true"></span>
+              <span id="theme-select-label">System</span>
+              <span data-momentum-icon="arrowTriangleDown"></span>
+            </button>
+            <div id="theme-select-menu" class="theme-select-menu" role="listbox" hidden>
+              <button class="theme-select-option" type="button" role="option" data-theme-choice="system">
+                <span data-momentum-icon="laptop"></span>
+                <span>System</span>
+              </button>
+              <button class="theme-select-option" type="button" role="option" data-theme-choice="light">
+                <span data-momentum-icon="brightnessHigh"></span>
+                <span>Light</span>
+              </button>
+              <button class="theme-select-option" type="button" role="option" data-theme-choice="dark">
+                <span data-momentum-icon="quietHoursPresence"></span>
+                <span>Dark</span>
+              </button>
+            </div>
+          </div>
           <button id="load-sample-button" class="ghost-button">Load Sample Macro</button>
           <button id="run-button" class="primary-button">Run Enabled Macros</button>
+          <button id="reset-button" class="panel-action">Reset Device State</button>
           <label class="topbar-select-shell" for="product-select">
             <span class="sr-only">Select product</span>
             <select id="product-select" class="topbar-select" aria-label="Select product"></select>
@@ -47,7 +100,11 @@
 
           <div id="file-list" class="file-list"></div>
 
-         
+          <footer class="navigator-footer">
+            <span data-momentum-icon="launch"></span>
+            <span id="navigator-version">RoomOS Macro Simulator v1</span>
+          </footer>
+
         </section>
 
         <div
@@ -146,10 +203,11 @@
             <div>
               <p class="panel-kicker">Simulator</p>
             </div>
-            <button id="reset-button" class="panel-action">Reset Device State</button>
+           
           </div>
 
           <div id="device-render-root" class="device-render-root"></div>
+        </section>
 
       </main>
     </div>
@@ -180,7 +238,6 @@
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/loader.min.js"></script>
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./src/app.ts"></script>
   </body>
 </html>

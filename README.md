@@ -4,11 +4,25 @@
 
 `RoomOS Macro Simulator` is a browser-based simulator for experimenting with RoomOS-style macros without needing physical Cisco devices. It provides a local macro editor, runtime log viewer, and simulated device surfaces for the on-screen display, controller UI, and room scheduler UI.
 
-![RoomOS Macro Simulator screenshot](images/readme-screenshot.png)
+Before running the bundled sample macro:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-before-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-before-light.png">
+  <img alt="RoomOS Macro Simulator before running the sample macro" src="screenshots/readme-screenshot-before-light.png">
+</picture>
+
+After running the bundled sample macro:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-after-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-after-light.png">
+  <img alt="RoomOS Macro Simulator after running the sample macro with visible surface alerts" src="screenshots/readme-screenshot-after-light.png">
+</picture>
 
 ## Overview
 
-This project is a static web application powered by Vite and plain JavaScript modules. Macro files are loaded into the Monaco editor, executed in-browser against a simulated `xapi` facade, and then reflected into the UI renderers that model RoomOS device surfaces.
+This project is a static web application powered by Vite and TypeScript modules. Macro files are loaded into the Monaco editor, executed in-browser against a simulated `xapi` facade, and then reflected into the UI renderers that model RoomOS device surfaces.
 
 The simulator currently includes:
 - a macro file list and editor
@@ -89,13 +103,28 @@ npm run test:e2e
 
 ## README Screenshot
 
-Generate the screenshot used in this README:
+Generate the screenshots used in this README:
 
 ```bash
 npm run screenshot:readme
 ```
 
-By default this starts a local Vite server, runs the bundled sample macro, and writes `images/readme-screenshot.png`. CI can override the capture target or output path with `README_SCREENSHOT_URL` and `README_SCREENSHOT_OUTPUT`.
+By default this starts a local Vite server and writes before and after screenshots for both light and dark themes:
+
+- `screenshots/readme-screenshot-before-light.png`
+- `screenshots/readme-screenshot-before-dark.png`
+- `screenshots/readme-screenshot-after-light.png`
+- `screenshots/readme-screenshot-after-dark.png`
+
+The after screenshots run the bundled sample macro first, so the OSD toast and controller alert modal are visible.
+
+Capture a single state and theme when needed:
+
+```bash
+npm run screenshot:readme -- --state after --theme dark --output screenshots/readme-screenshot-after-dark.png
+```
+
+CI can override the capture target, output path, state, and theme with `README_SCREENSHOT_URL`, `README_SCREENSHOT_OUTPUT`, `README_SCREENSHOT_STATE`, and `README_SCREENSHOT_THEME`. Use `{state}` and `{theme}` in the output path when capturing multiple variants; if omitted, the script appends the missing values before the file extension.
 
 ## License
 
