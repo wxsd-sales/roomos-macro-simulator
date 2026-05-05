@@ -1,41 +1,14 @@
-import googleMeetIconUrl from "@momentum-design/brand-visuals/dist/svg/google-meet-color.svg?url";
-import microsoftTeamsIconUrl from "@momentum-design/brand-visuals/dist/svg/ms-teams-color.svg?url";
-import webexAppIconUrl from "@momentum-design/brand-visuals/dist/svg/webex-app-icon-color-container.svg?url";
-import zoomIconUrl from "@momentum-design/brand-visuals/dist/svg/zoom-color.svg?url";
-import { icon } from "../../../icons.ts";
-import type { DevicePanel, DeviceRendererAdapter, DeviceState } from "../../../types.ts";
-
-type OsdActionIcon =
-  | "call"
-  | "whiteboard"
-  | "share"
-  | "webex"
-  | "files"
-  | "zoom"
-  | "microsoftTeams"
-  | "googleMeet"
-  | "custom";
-
-interface OsdAction {
-  id: string;
-  label: string;
-  icon: OsdActionIcon;
-}
+import {
+  createRoundActionButtonMarkup,
+  getSurfaceActionFromPanel,
+  OSD_NATIVE_ACTIONS,
+} from "../../surfaceActionButtons.ts";
+import type { DeviceRendererAdapter, DeviceState } from "../../../types.ts";
 
 interface OsdRendererOptions {
   root: HTMLElement;
   onSelectPanel?: (panel: string) => void;
 }
-
-const NATIVE_ACTIONS: OsdAction[] = [
-  { id: "native-call", label: "Call", icon: "call" },
-  { id: "native-whiteboard", label: "Whiteboard", icon: "whiteboard" },
-  { id: "native-share", label: "Share", icon: "share" },
-  { id: "native-webex", label: "Webex", icon: "webex" },
-  { id: "native-zoom", label: "Zoom", icon: "zoom" },
-  { id: "native-microsoft-teams", label: "Microsoft Teams", icon: "microsoftTeams" },
-  { id: "native-google-meet", label: "Google Meet", icon: "googleMeet" },
-];
 
 function requireElement<T extends Element>(root: ParentNode, selector: string): T {
   const element = root.querySelector(selector);
@@ -46,63 +19,8 @@ function requireElement<T extends Element>(root: ParentNode, selector: string): 
   return element as T;
 }
 
-function escapeHtml(text: unknown): string {
-  return String(text ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function getBrandIconMarkup(iconUrl: string, label: string): string {
-  return `
-    <img
-      class="osd-action-image osd-brand-action-image"
-      src="${iconUrl}"
-      alt=""
-      aria-hidden="true"
-      data-brand-icon="${escapeHtml(label)}"
-    />
-  `;
-}
-
-function getActionIconMarkup(action: OsdAction): string {
-  switch (action.icon) {
-    case "call":
-      return icon("camera");
-    case "whiteboard":
-      return icon("whiteboard");
-    case "share":
-      return icon("contentShare");
-    case "webex":
-      return getBrandIconMarkup(webexAppIconUrl, "Webex");
-    case "files":
-      return icon("files");
-    case "zoom":
-      return getBrandIconMarkup(zoomIconUrl, "Zoom");
-    case "microsoftTeams":
-      return getBrandIconMarkup(microsoftTeamsIconUrl, "Microsoft Teams");
-    case "googleMeet":
-      return getBrandIconMarkup(googleMeetIconUrl, "Google Meet");
-    default:
-      return `
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M24 11a11 11 0 0 1 11 11v3.2c0 2.25.74 4.45 2.1 6.24L39 34H9l1.9-2.56A10.6 10.6 0 0 0 13 25.2V22a11 11 0 0 1 11-11Zm0 28a5.5 5.5 0 0 0 5.3-4h-10.6A5.5 5.5 0 0 0 24 39Z" fill="currentColor"/>
-        </svg>
-      `;
-  }
-}
-
-function getCustomAction(action: DevicePanel, index: number): OsdAction {
-  const label = action.name ?? action.id ?? `Action ${index + 1}`;
-  const normalizedLabel = label.trim().toLowerCase();
-
-  return {
-    id: action.id ?? `panel-${index + 1}`,
-    label,
-    icon: normalizedLabel === "files" ? "files" : "custom",
-  };
+function getIconMarkup(iconClass: string, className = "momentum-icon"): string {
+  return `<span class="${className} icon ${iconClass}" aria-hidden="true"></span>`;
 }
 
 export function createOsdRenderer({
@@ -119,11 +37,11 @@ export function createOsdRenderer({
           </button>
           <div class="osd-statusbar">
             <span class="osd-status-item" aria-hidden="true">
-              ${icon("airplay", "momentum-icon osd-status-icon")}
+              ${getIconMarkup("icon-airplay-regular", "momentum-icon osd-status-icon")}
               <span>AirPlay</span>
             </span>
             <span class="osd-status-item" aria-hidden="true">
-              ${icon("deviceConnection", "momentum-icon osd-status-icon")}
+              ${getIconMarkup("icon-device-connection-regular", "momentum-icon osd-status-icon")}
               <span>Miracast</span>
             </span>
             <span data-device-clock class="osd-clock">22:57</span>
@@ -147,7 +65,7 @@ export function createOsdRenderer({
 
         <div data-alert-layer class="osd-alert-layer hidden">
           <div class="osd-alert-card" role="status" aria-live="polite">
-            <span class="osd-alert-icon">${icon("priorityCircle")}</span>
+            <span class="osd-alert-icon">${getIconMarkup("icon-priority-circle-regular")}</span>
             <div class="osd-alert-copy">
               <h4 data-alert-title>Alert title</h4>
               <p data-alert-text>Alert text</p>
@@ -168,7 +86,7 @@ export function createOsdRenderer({
   };
 
   function renderActions(device: DeviceState): void {
-    const actions = [...NATIVE_ACTIONS, ...device.panels.map(getCustomAction)].slice(0, 16);
+    const actions = [...OSD_NATIVE_ACTIONS, ...device.panels.map(getSurfaceActionFromPanel)].slice(0, 16);
 
     refs.actions.innerHTML = actions
       .map((action) => {
@@ -177,19 +95,19 @@ export function createOsdRenderer({
           device.activePanel === action.label ||
           (!device.panels.length && action.id === "native-call");
 
-        return `
-          <div class="osd-action-tile">
-            <button
-              class="osd-action-button ${isActive ? "active" : ""}"
-              type="button"
-              tabindex="-1"
-              data-osd-action="${escapeHtml(action.id)}"
-            >
-              <span class="osd-action-icon">${getActionIconMarkup(action)}</span>
-            </button>
-            <span class="osd-action-label">${escapeHtml(action.label)}</span>
-          </div>
-        `;
+        return createRoundActionButtonMarkup({
+          action,
+          tileClass: "osd-action-tile",
+          buttonClass: "osd-action-button",
+          iconClass: "osd-action-icon",
+          labelClass: "osd-action-label",
+          dataAttribute: "data-osd-action",
+          active: isActive,
+          tabIndex: -1,
+          imageClass: "osd-action-image",
+          brandImageClass: "osd-brand-action-image",
+          customImageClass: "surface-custom-action-image",
+        });
       })
       .join("");
 

@@ -4,32 +4,33 @@
 
 `RoomOS Macro Simulator` is a browser-based simulator for experimenting with RoomOS-style macros without needing physical Cisco devices. It provides a local macro editor, runtime log viewer, and simulated device surfaces for the on-screen display, controller UI, and room scheduler UI.
 
-Before running the bundled sample macro:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-before-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-before-light.png">
-  <img alt="RoomOS Macro Simulator before running the sample macro" src="screenshots/readme-screenshot-before-light.png">
-</picture>
-
-After running the bundled sample macro:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-after-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-after-light.png">
-  <img alt="RoomOS Macro Simulator after running the sample macro with visible surface alerts" src="screenshots/readme-screenshot-after-light.png">
-</picture>
+<a href="https://wxsd-sales.github.io/roomos-macro-simulator">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-before-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-before-light.png">
+    <img alt="RoomOS Macro Simulator before running the sample macro" src="screenshots/readme-screenshot-before-light.png">
+  </picture>
+</a>
 
 ## Overview
 
 This project is a static web application powered by Vite and TypeScript modules. Macro files are loaded into the Monaco editor, executed in-browser against a simulated `xapi` facade, and then reflected into the UI renderers that model RoomOS device surfaces.
 
 The simulator currently includes:
+
 - a macro file list and editor
 - an internal runtime log viewer
 - simulated OSD, controller, and room scheduler surfaces
 - sample macros for quick testing
 - unit and end-to-end test coverage for key flows
+
+<a href="https://wxsd-sales.github.io/roomos-macro-simulator">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/readme-screenshot-after-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="screenshots/readme-screenshot-after-light.png">
+    <img alt="RoomOS Macro Simulator after running the sample macro with visible surface alerts" src="screenshots/readme-screenshot-after-light.png">
+  </picture>
+</a>
 
 ## Live Demo
 
@@ -37,7 +38,7 @@ Check out the live demo here:
 
 https://wxsd-sales.github.io/roomos-macro-simulator
 
-*For more demos & PoCs like this, check out our [Webex Labs site](https://collabtoolbox.cisco.com/webex-labs).*
+_For more demos & PoCs like this, check out our [Webex Labs site](https://collabtoolbox.cisco.com/webex-labs)._
 
 ## Local Setup
 

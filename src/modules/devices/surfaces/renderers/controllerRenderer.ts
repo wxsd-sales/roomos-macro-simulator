@@ -1,26 +1,15 @@
-import { icon } from "../../../icons.ts";
-import type { DevicePanel, DeviceRendererAdapter, DeviceState } from "../../../types.ts";
-
-type ControllerActionIcon = "call" | "share" | "webex" | "zoom" | "sliders" | "lightbulb" | "custom";
-
-interface ControllerAction {
-  id: string;
-  label: string;
-  icon: ControllerActionIcon;
-}
+import {
+  CONTROLLER_NATIVE_ACTIONS,
+  createRoundActionButtonMarkup,
+  getSurfaceActionFromPanel,
+} from "../../surfaceActionButtons.ts";
+import type { DeviceRendererAdapter, DeviceState } from "../../../types.ts";
 
 interface ControllerRendererOptions {
   root: HTMLElement;
   onDismissAlert: () => void;
   onSelectPanel: (panel: string) => void;
 }
-
-const NATIVE_CONTROLLER_ACTIONS: ControllerAction[] = [
-  { id: "native-call", label: "Call", icon: "call" },
-  { id: "native-share", label: "Share", icon: "share" },
-  { id: "native-webex", label: "Webex", icon: "webex" },
-  { id: "native-zoom", label: "Zoom", icon: "zoom" },
-];
 
 function requireElement<T extends Element>(root: ParentNode, selector: string): T {
   const element = root.querySelector(selector);
@@ -31,13 +20,8 @@ function requireElement<T extends Element>(root: ParentNode, selector: string): 
   return element as T;
 }
 
-function escapeHtml(text: unknown): string {
-  return String(text ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function getIconMarkup(iconClass: string, className = "momentum-icon"): string {
+  return `<span class="${className} icon ${iconClass}" aria-hidden="true"></span>`;
 }
 
 function formatControllerDate(date: Date): string {
@@ -46,56 +30,6 @@ function formatControllerDate(date: Date): string {
     month: "long",
     day: "numeric",
   });
-}
-
-function getActionIconMarkup(action: ControllerAction): string {
-  switch (action.icon) {
-    case "call":
-      return icon("camera");
-    case "share":
-      return icon("contentShare");
-    case "webex":
-      return `
-        <img
-          class="osd-action-image zoom-action-image"
-          src="https://www.webex.com/content/dam/wbx/global/images/webex-favicon.png"
-          alt=""
-          aria-hidden="true"
-        />
-      `;
-    case "zoom":
-      return `
-        <img
-          class="controller-action-image zoom-action-image"
-          src="https://media.zoom.com/images/assets/virtual-meetings-white.svg/Zz02OTBlMzAzOGJkY2QxMWVkYjk4Y2NlMzFjZDhkNzM5MA=="
-          alt=""
-          aria-hidden="true"
-        />
-      `;
-    case "sliders":
-      return icon("adjust");
-    case "lightbulb":
-        return icon("lightbulb");
-    default:
-      return `
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M24 8c6.08 0 11 4.92 11 11v3.1c0 2.18.72 4.3 2.04 6.04L39.4 31H8.6l2.36-2.86A9.67 9.67 0 0 0 13 22.1V19c0-6.08 4.92-11 11-11Zm0 28.5c3.06 0 5.66-2.02 6.53-4.8H17.47c.87 2.78 3.47 4.8 6.53 4.8Z" fill="currentColor"/>
-        </svg>
-      `;
-  }
-}
-
-function getCustomAction(panel: DevicePanel, index: number): ControllerAction {
-  return {
-    id: panel.id ?? `panel-${index + 1}`,
-    label: panel.name ?? panel.id ?? `Action ${index + 1}`,
-    icon: "custom",
-  };
-}
-
-function isControllerSupportedPanel(panel: DevicePanel): boolean {
-  const activityType = String(panel.activityType ?? "Custom").toLowerCase();
-  return activityType !== "webapp";
 }
 
 export function createControllerRenderer({
@@ -135,11 +69,11 @@ export function createControllerRenderer({
 
         <div class="controller-volume-panel" aria-hidden="true">
           <button class="controller-volume-button" type="button" tabindex="-1">
-            <span class="controller-volume-icon">${icon("speakerTurnDown")}</span>
+            <span class="controller-volume-icon">${getIconMarkup("icon-speaker-turn-down-regular")}</span>
             <span class="sr-only">Volume down</span>
           </button>
           <button class="controller-volume-button" type="button" tabindex="-1">
-            <span class="controller-volume-icon">${icon("speakerTurnUp")}</span>
+            <span class="controller-volume-icon">${getIconMarkup("icon-speaker-turn-up-regular")}</span>
             <span class="sr-only">Volume up</span>
           </button>
         </div>
@@ -169,8 +103,8 @@ export function createControllerRenderer({
   refs.dismissAlertButton.addEventListener("click", onDismissAlert);
 
   function renderActions(device: DeviceState): void {
-    const customActions = device.panels.filter(isControllerSupportedPanel).map(getCustomAction);
-    const actions = [...NATIVE_CONTROLLER_ACTIONS, ...customActions].slice(0, 9);
+    const customActions = device.panels.map(getSurfaceActionFromPanel);
+    const actions = [...CONTROLLER_NATIVE_ACTIONS, ...customActions].slice(0, 9);
 
     refs.actions.innerHTML = actions
       .map((action, index) => {
@@ -179,18 +113,18 @@ export function createControllerRenderer({
           device.activePanel === action.label ||
           (!customActions.length && index === 0);
 
-        return `
-          <div class="controller-action-tile">
-            <button
-              class="controller-action-button ${isActive ? "active" : ""}"
-              type="button"
-              data-controller-action="${escapeHtml(action.id)}"
-            >
-              <span class="controller-action-icon">${getActionIconMarkup(action)}</span>
-            </button>
-            <span class="controller-action-label">${escapeHtml(action.label)}</span>
-          </div>
-        `;
+        return createRoundActionButtonMarkup({
+          action,
+          tileClass: "controller-action-tile",
+          buttonClass: "controller-action-button",
+          iconClass: "controller-action-icon",
+          labelClass: "controller-action-label",
+          dataAttribute: "data-controller-action",
+          active: isActive,
+          imageClass: "controller-action-image",
+          brandImageClass: "controller-brand-action-image",
+          customImageClass: "surface-custom-action-image",
+        });
       })
       .join("");
 

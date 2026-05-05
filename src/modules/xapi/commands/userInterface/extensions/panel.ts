@@ -1,4 +1,5 @@
 import type { AddLog, DevicePanel, DeviceState } from "../../../../types.ts";
+import { normalizeCustomIconDataUri } from "../../../../devices/customIconData.ts";
 
 type XapiPayload = Record<string, unknown>;
 type EmitEvent = (path: string, payload: unknown) => void;
@@ -15,6 +16,8 @@ interface ParsedPanel {
   activityType?: string;
   icon?: string;
   location?: string;
+  customIconDataUri?: string;
+  customIconId?: string;
 }
 
 export const PANEL_COMMAND_PATHS = new Set([
@@ -41,8 +44,33 @@ function toStringValue(value: unknown, fallback = ""): string {
   return normalized || fallback;
 }
 
-function getXmlText(node: Element, tagName: string): string {
-  return node.querySelector(tagName)?.textContent?.trim() ?? "";
+function getXmlText(node: Element | null, tagName: string): string {
+  return node?.querySelector(tagName)?.textContent?.trim() ?? "";
+}
+
+function getStringPayloadValue(payload: XapiPayload, names: string[]): unknown {
+  return names.map((name) => payload[name]).find((value) => toStringValue(value));
+}
+
+function getCustomIconInput(payload: XapiPayload, extraInput?: unknown): { content?: unknown; id?: unknown } {
+  const extraPayload = toPayload(extraInput);
+  const payloadCustomIcon = toPayload(payload.CustomIcon);
+  const extraCustomIcon = toPayload(extraPayload.CustomIcon);
+  const extraContent = typeof extraInput === "string" ? extraInput : undefined;
+
+  return {
+    content:
+      extraContent ??
+      getStringPayloadValue(extraPayload, ["CustomIconDataUri", "CustomIconDataURI", "CustomIconContent", "Content", "DataUri", "DataURI", "Image"]) ??
+      getStringPayloadValue(extraCustomIcon, ["Content", "DataUri", "DataURI", "Image"]) ??
+      getStringPayloadValue(payload, ["CustomIconDataUri", "CustomIconDataURI", "CustomIconContent"]) ??
+      getStringPayloadValue(payloadCustomIcon, ["Content", "DataUri", "DataURI", "Image"]),
+    id:
+      getStringPayloadValue(extraPayload, ["CustomIconId", "Id"]) ??
+      getStringPayloadValue(extraCustomIcon, ["Id"]) ??
+      getStringPayloadValue(payload, ["CustomIconId"]) ??
+      getStringPayloadValue(payloadCustomIcon, ["Id"]),
+  };
 }
 
 function parseWithDomParser(xml: string): ParsedPanel[] | null {
@@ -55,13 +83,19 @@ function parseWithDomParser(xml: string): ParsedPanel[] | null {
     return [];
   }
 
-  return Array.from(document.querySelectorAll("Panel")).map((panel) => ({
-    id: getXmlText(panel, "PanelId") || undefined,
-    name: getXmlText(panel, "Name") || undefined,
-    activityType: getXmlText(panel, "ActivityType") || undefined,
-    icon: getXmlText(panel, "Icon") || undefined,
-    location: getXmlText(panel, "Location") || undefined,
-  }));
+  return Array.from(document.querySelectorAll("Panel")).map((panel) => {
+    const customIcon = panel.querySelector("CustomIcon");
+
+    return {
+      id: getXmlText(panel, "PanelId") || undefined,
+      name: getXmlText(panel, "Name") || undefined,
+      activityType: getXmlText(panel, "ActivityType") || undefined,
+      icon: getXmlText(panel, "Icon") || undefined,
+      location: getXmlText(panel, "Location") || undefined,
+      customIconDataUri: normalizeCustomIconDataUri(getXmlText(customIcon, "Content") || getXmlText(panel, "CustomIconContent")),
+      customIconId: getXmlText(customIcon, "Id") || undefined,
+    };
+  });
 }
 
 function escapeRegExp(value: string): string {
@@ -77,13 +111,21 @@ function parseWithFallback(xml: string): ParsedPanel[] {
   const panels = [...xml.matchAll(/<Panel\b[^>]*>([\s\S]*?)<\/Panel>/gi)].map((match) => match[1] ?? "");
   const panelXmlBlocks = panels.length ? panels : [xml];
 
-  return panelXmlBlocks.map((panelXml) => ({
-    id: extractTagText(panelXml, "PanelId") || undefined,
-    name: extractTagText(panelXml, "Name") || undefined,
-    activityType: extractTagText(panelXml, "ActivityType") || undefined,
-    icon: extractTagText(panelXml, "Icon") || undefined,
-    location: extractTagText(panelXml, "Location") || undefined,
-  }));
+  return panelXmlBlocks.map((panelXml) => {
+    const customIconXml = extractTagText(panelXml, "CustomIcon");
+
+    return {
+      id: extractTagText(panelXml, "PanelId") || undefined,
+      name: extractTagText(panelXml, "Name") || undefined,
+      activityType: extractTagText(panelXml, "ActivityType") || undefined,
+      icon: extractTagText(panelXml, "Icon") || undefined,
+      location: extractTagText(panelXml, "Location") || undefined,
+      customIconDataUri: normalizeCustomIconDataUri(
+        extractTagText(customIconXml || panelXml, "Content") || extractTagText(panelXml, "CustomIconContent"),
+      ),
+      customIconId: extractTagText(customIconXml, "Id") || undefined,
+    };
+  });
 }
 
 function parsePanelsXml(xml: unknown): ParsedPanel[] {
@@ -101,17 +143,21 @@ function createPanelFromXml({
   rawXml,
   index,
   existingCount,
+  customIconInput,
 }: {
   payload: XapiPayload;
   parsedPanel: ParsedPanel;
   rawXml: string;
   index: number;
   existingCount: number;
+  customIconInput: { content?: unknown; id?: unknown };
 }): DevicePanel {
   const id = toStringValue(
     parsedPanel.id ?? payload.PanelId ?? payload.PanelID ?? payload.Id,
     `panel-${existingCount + index + 1}`,
   );
+  const customIconDataUri = normalizeCustomIconDataUri(customIconInput.content ?? parsedPanel.customIconDataUri);
+  const customIconId = toStringValue(customIconInput.id ?? parsedPanel.customIconId);
 
   return {
     id,
@@ -119,6 +165,8 @@ function createPanelFromXml({
     activityType: toStringValue(payload.ActivityType ?? parsedPanel.activityType, "Custom"),
     icon: toStringValue(payload.Icon ?? parsedPanel.icon),
     location: toStringValue(payload.Location ?? parsedPanel.location, "HomeScreen"),
+    customIconDataUri,
+    customIconId: customIconId || undefined,
     rawXml,
   };
 }
@@ -151,6 +199,7 @@ export function createPanelCommandHandler({
     const rawXml = toStringValue(args[1] ?? payload.XML ?? payload.Xml ?? payload.Body);
     const parsedPanels = parsePanelsXml(rawXml);
     const panelInputs = parsedPanels.length ? parsedPanels : [{}];
+    const customIconInput = getCustomIconInput(payload, args[2]);
     const savedPanels = panelInputs.map((parsedPanel, index) =>
       createPanelFromXml({
         payload,
@@ -158,6 +207,7 @@ export function createPanelCommandHandler({
         rawXml,
         index,
         existingCount: device.panels.length,
+        customIconInput,
       }),
     );
 

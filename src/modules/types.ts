@@ -15,6 +15,8 @@ export interface DevicePanel {
   activityType: string;
   icon?: string;
   location?: string;
+  customIconDataUri?: string;
+  customIconId?: string;
   rawXml?: string;
 }
 

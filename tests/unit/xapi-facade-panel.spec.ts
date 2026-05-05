@@ -54,6 +54,10 @@ describe("xapi user interface extension panel facade", () => {
           <Icon>Lightbulb</Icon>
           <Name>Toggle Lights</Name>
           <ActivityType>Custom</ActivityType>
+          <CustomIcon>
+            <Content>iVBORw0KGgo=</Content>
+            <Id>custom-icon-1</Id>
+          </CustomIcon>
         </Panel>
       </Extensions>`;
 
@@ -82,6 +86,8 @@ describe("xapi user interface extension panel facade", () => {
         activityType: "Custom",
         icon: "Lightbulb",
         location: "HomeScreen",
+        customIconDataUri: "data:image/png;base64,iVBORw0KGgo=",
+        customIconId: "custom-icon-1",
         rawXml: expect.stringContaining("<Extensions>"),
       }),
     ]);
@@ -129,6 +135,24 @@ describe("xapi user interface extension panel facade", () => {
       id: "lights",
       name: "Lights Updated",
       activityType: "WebApp",
+    });
+  });
+
+  it("accepts custom icon image content as an additional panel save argument", async () => {
+    const { device, xapi } = createFacade();
+
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "custom-button" },
+      "<Extensions><Panel><Name>Button</Name><Icon>Custom</Icon><ActivityType>Custom</ActivityType></Panel></Extensions>",
+      { Content: "iVBORw0KGgo=", Id: "custom-icon-2" },
+    );
+
+    expect(device.panels[0]).toMatchObject({
+      id: "custom-button",
+      name: "Button",
+      icon: "Custom",
+      customIconDataUri: "data:image/png;base64,iVBORw0KGgo=",
+      customIconId: "custom-icon-2",
     });
   });
 });

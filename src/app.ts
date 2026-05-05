@@ -1,6 +1,4 @@
 import type { MonacoEditorInstance } from "./modules/editor/monacoEditor.ts";
-import { hydrateIcons, icon } from "./modules/icons.ts";
-import type { IconName } from "./modules/icons.ts";
 import { products } from "./modules/productHelper.ts";
 import { createAppState, createDeviceActions } from "./modules/app/index.ts";
 import { createDeviceInstance } from "./modules/devices/index.ts";
@@ -24,10 +22,10 @@ const MOMENTUM_THEME_CLASS_BY_THEME: Record<ResolvedTheme, string> = {
   light: "mds-theme-stable-lightWebex",
   dark: "mds-theme-stable-darkWebex",
 };
-const THEME_ICON_BY_PREFERENCE: Record<ThemePreference, IconName> = {
-  system: "laptop",
-  light: "brightnessHigh",
-  dark: "quietHoursPresence",
+const THEME_ICON_CLASS_BY_PREFERENCE: Record<ThemePreference, string> = {
+  system: "icon-laptop-regular",
+  light: "icon-brightness-high-filled",
+  dark: "icon-quiet-hours-presence-filled",
 };
 
 interface PointerResizeOptions {
@@ -55,6 +53,10 @@ function getEventTargetElement(event: Event): Element | null {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function getIconMarkup(iconClass: string, className = "momentum-icon"): string {
+  return `<span class="${className} icon ${iconClass}" aria-hidden="true"></span>`;
 }
 
 function isThemePreference(value: string | null): value is ThemePreference {
@@ -130,7 +132,7 @@ function updateThemeSelect(): void {
   const resolvedTheme = resolveThemePreference();
   const preferenceLabel = formatThemePreference(themePreference);
   els.themeSelectLabel.textContent = preferenceLabel;
-  els.themeSelectCurrentIcon.innerHTML = icon(THEME_ICON_BY_PREFERENCE[themePreference]);
+  els.themeSelectCurrentIcon.innerHTML = getIconMarkup(THEME_ICON_CLASS_BY_PREFERENCE[themePreference]);
   els.themeSelectButton.setAttribute(
     "aria-label",
     `Theme: ${preferenceLabel}. Active theme: ${resolvedTheme}. Open theme menu.`,
@@ -664,7 +666,7 @@ function getFileItemMarkup(file: AppFile): string {
         isFileDirty(file)
           ? `
             <button class="file-save-button" type="button" aria-label="Save ${escapeHtml(file.name)} to simulated device">
-              ${icon("save")}
+              ${getIconMarkup("icon-save-regular")}
             </button>
           `
           : ""
@@ -677,7 +679,7 @@ function getFileItemMarkup(file: AppFile): string {
         aria-expanded="${file.id === state.openFileMenuId ? "true" : "false"}"
         aria-label="File actions for ${escapeHtml(file.name)}"
       >
-        ${icon("tools")}
+        ${getIconMarkup("icon-tools-regular")}
       </button>
       <input class="file-toggle" type="checkbox" ${file.enabled ? "checked" : ""} aria-label="${file.enabled ? "Disable" : "Enable"} ${file.name}" />
     </div>
@@ -1245,7 +1247,6 @@ function resetSimulator(): void {
 }
 
 els.fileInput.addEventListener("change", handleFileUpload);
-hydrateIcons();
 initializeNavigatorFooter();
 initializeProductSelect();
 applyTheme();
