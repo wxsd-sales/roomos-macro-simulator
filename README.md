@@ -44,8 +44,16 @@ _For more demos & PoCs like this, check out our [Webex Labs site](https://collab
 
 ### Requirements
 
-- Node.js 18+ recommended
+- Node.js 26.3.0 or newer
 - npm
+
+Use the pinned version from `.nvmrc` when working locally:
+
+```bash
+nvm install
+nvm use
+node -v
+```
 
 ### Install
 

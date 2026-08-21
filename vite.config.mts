@@ -1,18 +1,23 @@
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  plugins: [react()],
   base: "./",
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes("node_modules/monaco-editor")) {
-            return "monaco";
-          }
-
-          if (id.includes("node_modules")) {
-            return "vendor";
-          }
+        codeSplitting: {
+          groups: [
+            {
+              name: "monaco",
+              test: /node_modules\/monaco-editor/,
+            },
+            {
+              name: "vendor",
+              test: /node_modules/,
+            },
+          ],
         },
       },
     },
