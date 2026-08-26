@@ -1,32 +1,28 @@
-import { collectPayloadShape, findNodeByPath, splitXapiPath } from "./schema.ts";
+import { findNodeByPath, getCommandParams } from "./schema.ts";
+import type {
+  SchemaRoots,
+  XapiKind,
+  XapiParam,
+  XapiSchemaBundle,
+  XapiSchemaNode,
+  XapiValuespace,
+} from "./schema.ts";
 
-type XapiKind = "Command" | "Status" | "Event";
-type SchemaNode = Record<string, any>;
 type XapiPayload = Record<string, unknown>;
 
-interface XapiSchemaRoots {
-  commandRoot?: SchemaNode | null;
-  statusRoot?: SchemaNode | null;
-  eventRoot?: SchemaNode | null;
-}
-
-interface XapiSchemaBundle {
-  schemaName?: string;
-  roots?: XapiSchemaRoots;
-}
-
 interface CreateXapiValidatorOptions {
-  schemaBundle?: XapiSchemaBundle | null;
+  schemaBundle?: { schemaName?: string; roots?: Partial<SchemaRoots> } | null;
   productId?: string | null;
   productName?: string | null;
   localCommandPaths?: Iterable<string>;
   localStatusPaths?: Iterable<string>;
   localEventPaths?: Iterable<string>;
+  localConfigPaths?: Iterable<string>;
 }
 
 export interface XapiValidationResult {
   ok: boolean;
-  node: SchemaNode | null;
+  node: XapiSchemaNode | null;
   errors: string[];
 }
 
@@ -34,39 +30,37 @@ export interface XapiValidator {
   validateCommand(path: string, payload?: unknown): XapiValidationResult;
   validateStatus(path: string): XapiValidationResult;
   validateEvent(path: string): XapiValidationResult;
+  validateConfig(path: string, value?: unknown): XapiValidationResult;
 }
 
 function formatPath(kind: XapiKind, path: string): string {
   return `xapi.${kind}.${path}`;
 }
 
-function getAvailableProducts(node: SchemaNode | null): string[] {
-  return Array.isArray(node?.products) ? node.products.map(String) : [];
-}
-
 function validateProductSupport(
-  node: SchemaNode,
+  node: XapiSchemaNode,
   productId: string | null | undefined,
   productName: string | null | undefined,
   kind: XapiKind,
   path: string,
 ): string[] {
-  const products = getAvailableProducts(node);
+  const products = node.products ?? [];
   if (!products.length || !productId || products.includes(productId)) {
     return [];
   }
 
-  return [
-    `${formatPath(kind, path)} is not available on ${productName ?? productId} (${productId}).`,
-  ];
+  return [`${formatPath(kind, path)} is not available on ${productName ?? productId} (${productId}).`];
 }
 
-function validatePayloadType(name: string, value: unknown, schemaNode: SchemaNode): string[] {
-  const valuespace = schemaNode?.valuespace;
-  const type = String(valuespace?.type ?? schemaNode?.type ?? "").toLowerCase();
-  const errors: string[] = [];
+function validateValue(name: string, value: unknown, valuespace: XapiValuespace | null): string[] {
+  if (!valuespace) {
+    return [];
+  }
 
-  if (Array.isArray(valuespace?.Values) && valuespace.Values.length) {
+  const errors: string[] = [];
+  const type = valuespace.type.toLowerCase();
+
+  if (valuespace.Values?.length) {
     const allowed = new Set(valuespace.Values.map(String));
     if (!allowed.has(String(value))) {
       errors.push(`${name} must be one of: ${valuespace.Values.join(", ")}.`);
@@ -74,25 +68,22 @@ function validatePayloadType(name: string, value: unknown, schemaNode: SchemaNod
     return errors;
   }
 
-  if (type.includes("integer") || type.includes("float") || type.includes("number")) {
+  if (/int|float|number/.test(type)) {
     const numeric = Number(value);
     if (Number.isNaN(numeric)) {
       errors.push(`${name} must be a number.`);
       return errors;
     }
-
-    const min = Number(valuespace?.Min ?? valuespace?.minimum ?? schemaNode?.minimum);
-    const max = Number(valuespace?.Max ?? valuespace?.maximum ?? schemaNode?.maximum);
-    if (!Number.isNaN(min) && numeric < min) {
-      errors.push(`${name} must be greater than or equal to ${min}.`);
+    if (valuespace.Min !== undefined && numeric < valuespace.Min) {
+      errors.push(`${name} must be greater than or equal to ${valuespace.Min}.`);
     }
-    if (!Number.isNaN(max) && numeric > max) {
-      errors.push(`${name} must be less than or equal to ${max}.`);
+    if (valuespace.Max !== undefined && numeric > valuespace.Max) {
+      errors.push(`${name} must be less than or equal to ${valuespace.Max}.`);
     }
     return errors;
   }
 
-  if (type.includes("boolean") && typeof value !== "boolean") {
+  if (/bool/.test(type) && typeof value !== "boolean") {
     errors.push(`${name} must be a boolean.`);
   }
 
@@ -100,32 +91,34 @@ function validatePayloadType(name: string, value: unknown, schemaNode: SchemaNod
 }
 
 function toPayloadObject(payload: unknown): XapiPayload {
-  return payload && typeof payload === "object" && !Array.isArray(payload) ? payload as XapiPayload : {};
+  return payload && typeof payload === "object" && !Array.isArray(payload)
+    ? (payload as XapiPayload)
+    : {};
 }
 
-function validatePayload(node: SchemaNode, payload: unknown, kind: XapiKind, path: string): string[] {
-  const payloadEntries = collectPayloadShape(node);
-  if (!payloadEntries.length) {
+function validateCommandPayload(node: XapiSchemaNode, payload: unknown, path: string): string[] {
+  const params = getCommandParams(node);
+  if (!params.length) {
     return [];
   }
 
   const errors: string[] = [];
   const payloadObject = toPayloadObject(payload);
-  const params = new Map(payloadEntries);
+  const byName = new Map<string, XapiParam>(params.map((param) => [param.name, param]));
 
-  payloadEntries.forEach(([name, schemaNode]) => {
-    if (schemaNode?.required === true && payloadObject[name] === undefined) {
-      errors.push(`${formatPath(kind, path)} requires ${name}.`);
+  params.forEach((param) => {
+    if (param.required && payloadObject[param.name] === undefined) {
+      errors.push(`${formatPath("Command", path)} requires ${param.name}.`);
     }
   });
 
   Object.entries(payloadObject).forEach(([name, value]) => {
-    const schemaNode = params.get(name);
-    if (!schemaNode) {
-      errors.push(`${formatPath(kind, path)} does not support argument ${name}.`);
+    const param = byName.get(name);
+    if (!param) {
+      errors.push(`${formatPath("Command", path)} does not support argument ${name}.`);
       return;
     }
-    errors.push(...validatePayloadType(name, value, schemaNode));
+    errors.push(...validateValue(name, value, param.valuespace));
   });
 
   return errors;
@@ -138,56 +131,66 @@ export function createXapiValidator({
   localCommandPaths = [],
   localStatusPaths = [],
   localEventPaths = [],
+  localConfigPaths = [],
 }: CreateXapiValidatorOptions = {}): XapiValidator {
   const roots = schemaBundle?.roots ?? {};
-  const localCommands = new Set(localCommandPaths);
-  const localStatuses = new Set(localStatusPaths);
-  const localEvents = new Set(localEventPaths);
+  const localPaths: Record<XapiKind, Set<string>> = {
+    Command: new Set(localCommandPaths),
+    Status: new Set(localStatusPaths),
+    Event: new Set(localEventPaths),
+    Config: new Set(localConfigPaths),
+  };
 
-  function validatePath(kind: XapiKind, root: SchemaNode | null | undefined, path: string, payload?: unknown): XapiValidationResult {
+  function validatePath(
+    kind: XapiKind,
+    root: XapiSchemaNode | null | undefined,
+    path: string,
+    validateNode: (node: XapiSchemaNode) => string[],
+  ): XapiValidationResult {
     if (!root) {
       return { ok: true, node: null, errors: [] };
     }
 
-    const node = findNodeByPath(root, splitXapiPath(path));
+    const node = findNodeByPath(root, path);
     if (!node) {
-      if (kind === "Command" && localCommands.has(path)) {
-        return { ok: true, node: null, errors: [] };
-      }
-      if (kind === "Status" && localStatuses.has(path)) {
-        return { ok: true, node: null, errors: [] };
-      }
-      if (kind === "Event" && localEvents.has(path)) {
+      if (localPaths[kind].has(path)) {
         return { ok: true, node: null, errors: [] };
       }
       return {
         ok: false,
         node: null,
-        errors: [`${formatPath(kind, path)} is not available in schema ${schemaBundle?.schemaName ?? ""}.`],
+        errors: [
+          `${formatPath(kind, path)} is not available in schema ${schemaBundle?.schemaName ?? ""}.`,
+        ],
       };
     }
 
     const errors = [
       ...validateProductSupport(node, productId, productName, kind, path),
-      ...(kind === "Command" ? validatePayload(node, payload, kind, path) : []),
+      ...validateNode(node),
     ];
 
-    return {
-      ok: errors.length === 0,
-      node,
-      errors,
-    };
+    return { ok: errors.length === 0, node, errors };
   }
 
   return {
     validateCommand(path, payload) {
-      return validatePath("Command", roots.commandRoot, path, payload);
+      return validatePath("Command", roots.commandRoot, path, (node) =>
+        validateCommandPayload(node, payload, path),
+      );
     },
     validateStatus(path) {
-      return validatePath("Status", roots.statusRoot, path);
+      return validatePath("Status", roots.statusRoot, path, () => []);
     },
     validateEvent(path) {
-      return validatePath("Event", roots.eventRoot, path);
+      return validatePath("Event", roots.eventRoot, path, () => []);
+    },
+    validateConfig(path, value) {
+      return validatePath("Config", roots.configRoot, path, (node) =>
+        value === undefined ? [] : validateValue(formatPath("Config", path), value, node.valuespace ?? null),
+      );
     },
   };
 }
+
+export type { XapiSchemaBundle };

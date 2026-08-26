@@ -17,6 +17,26 @@ const xml = `
 
 xapi.Command.UserInterface.Extensions.Panel.Save({ PanelId: 'lights'}, xml );
 
+xapi.Command.UserInterface.Extensions.Panel.Save({ PanelId: 'camera-preset' }, `
+<Extensions>
+  <Panel>
+    <Location>CallControls</Location>
+    <Icon>Camera</Icon>
+    <Name>Camera Presets</Name>
+    <ActivityType>Custom</ActivityType>
+  </Panel>
+</Extensions>`);
+
+xapi.Command.UserInterface.Extensions.Panel.Save({ PanelId: 'report-issue' }, `
+<Extensions>
+  <Panel>
+    <Location>RoomScheduler</Location>
+    <Icon>Help</Icon>
+    <Name>Report Issue</Name>
+    <ActivityType>Custom</ActivityType>
+  </Panel>
+</Extensions>`);
+
 xapi.Event.UserInterface.Extensions.Panel.Clicked.on(event => {
   const { PanelId, Origin, PeripheralId } = event; 
   if( PanelId != 'lights' ) return
@@ -35,5 +55,25 @@ xapi.Command.Bookings.Book({
   Title: 'Example Meeting'
 });
 
+
+// Statuses are read with .get() and can be watched with .on().
+xapi.Status.Standby.State.get().then(state => {
+  console.log('Standby state is ' + state);
+});
+
+// Configurations support .get(), .set() and .on().
+xapi.Config.Audio.DefaultVolume.set(50);
+
+xapi.Config.UserInterface.Language.get().then(language => {
+  console.log('UI language is ' + language);
+});
+
+// UserInterface Features decides which native buttons the OSD and Controller
+// show. Auto puts a button on screen, Hidden takes it away. The simulator starts
+// from the schema defaults, which ship the Zoom join button hidden.
+xapi.Config.UserInterface.Features.Call.JoinZoom.set('Auto');
+
+// Uncomment to drop the call button from both interfaces.
+// xapi.Config.UserInterface.Features.Call.Start.set('Hidden');
 
 console.log('Macro executed in simulator');

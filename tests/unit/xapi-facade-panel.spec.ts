@@ -155,4 +155,57 @@ describe("xapi user interface extension panel facade", () => {
       customIconId: "custom-icon-2",
     });
   });
+
+  it("stores the canonical Location parsed from the panel XML", async () => {
+    const { device, xapi } = createFacade();
+
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "presets" },
+      "<Extensions><Panel><Location>callcontrols</Location><Name>Presets</Name></Panel></Extensions>",
+    );
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "issue" },
+      "<Extensions><Panel><Location>RoomScheduler</Location><Name>Report Issue</Name></Panel></Extensions>",
+    );
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "secret" },
+      "<Extensions><Panel><Location>Hidden</Location><Name>Secret</Name></Panel></Extensions>",
+    );
+
+    expect(device.panels.map((panel) => [panel.id, panel.location])).toEqual([
+      ["presets", "CallControls"],
+      ["issue", "RoomScheduler"],
+      ["secret", "Hidden"],
+    ]);
+  });
+
+  it("defaults to HomeScreen and warns when the Location is unknown", async () => {
+    const { device, logs, xapi } = createFacade();
+
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "odd" },
+      "<Extensions><Panel><Location>Sidebar</Location><Name>Odd</Name></Panel></Extensions>",
+    );
+
+    expect(device.panels[0]).toMatchObject({ id: "odd", location: "HomeScreen" });
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          level: "warn",
+          message: expect.stringContaining('unknown location "Sidebar"'),
+        }),
+      ]),
+    );
+  });
+
+  it("defaults to HomeScreen when the XML omits a Location", async () => {
+    const { device, xapi } = createFacade();
+
+    await xapi.Command.UserInterface.Extensions.Panel.Save(
+      { PanelId: "plain" },
+      "<Extensions><Panel><Name>Plain</Name></Panel></Extensions>",
+    );
+
+    expect(device.panels[0]).toMatchObject({ location: "HomeScreen" });
+  });
 });

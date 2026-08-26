@@ -61,6 +61,19 @@ export interface Booking {
   state: "scheduled" | "started" | "ended";
 }
 
+export interface CallState {
+  /** Drives whether HomeScreen or CallControls panels are on screen. */
+  active: boolean;
+  remoteNumber: string;
+}
+
+/**
+ * Live `xapi.Config` values keyed by dotted path, e.g.
+ * `UserInterface.Features.Call.Start`. Seeded from the schema defaults so the
+ * UI can read a configuration without waiting for a macro to write it.
+ */
+export type DeviceConfig = Record<string, unknown>;
+
 export interface DeviceState {
   alert: DeviceAlert | null;
   panels: DevicePanel[];
@@ -69,11 +82,14 @@ export interface DeviceState {
   meeting: MeetingState;
   scheduler: SchedulerState;
   bookings: Booking[];
+  call: CallState;
+  config: DeviceConfig;
 }
 
-export type DeviceStateOverrides = Partial<Omit<DeviceState, "meeting" | "scheduler">> & {
+export type DeviceStateOverrides = Partial<Omit<DeviceState, "meeting" | "scheduler" | "call">> & {
   meeting?: Partial<MeetingState>;
   scheduler?: Partial<SchedulerState>;
+  call?: Partial<CallState>;
 };
 
 export interface DeviceRuntime {

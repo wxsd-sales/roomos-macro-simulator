@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { MonacoEditorInstance } from "../../modules/editor/monacoEditor.ts";
 import { useAppStore } from "../app/AppProvider.tsx";
 import { getMonacoThemeName } from "../theme/themeUtils.ts";
-import { registerMonacoHost, registerXapiSchemaReady } from "../../legacy/monacoHost.ts";
+import {
+  registerMonacoHost,
+  registerXapiSchemaReady,
+  updateXapiSchemaBundle,
+} from "../../legacy/monacoHost.ts";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -68,6 +72,7 @@ export function CodeEditor() {
 
         const schemaReady = installXapiIntellisense({
           monaco: monacoApi,
+          onSchemaRefresh: updateXapiSchemaBundle,
           addLog: (message, level = "info") => {
             dispatch({
               type: "ADD_LOG",

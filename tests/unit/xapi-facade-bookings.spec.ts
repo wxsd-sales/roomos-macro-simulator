@@ -17,6 +17,7 @@ const schema = {
           { name: "OrganizerEmail", valuespace: { type: "String" } },
           { name: "OrganizerName", valuespace: { type: "String" } },
           { name: "Protocol", valuespace: { type: "String" } },
+          { name: "StartTime", valuespace: { type: "String" } },
           { name: "Title", valuespace: { type: "String" } },
         ],
       },
@@ -127,6 +128,44 @@ describe("xapi bookings facade", () => {
       expect(availabilityStatuses.at(-1)).toBe("Available");
       expect(device.scheduler.busy).toBe(false);
       expect(renderDevice).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stores every booking in order and keeps the room available until the first one starts", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 27, 10, 4, 0, 0));
+
+    try {
+      const { device, xapi } = createFacade();
+
+      await xapi.Command.Bookings.Book({
+        Duration: 30,
+        StartTime: new Date(2026, 3, 27, 14, 30, 0, 0).toISOString(),
+        Title: "Sprint planning",
+      });
+      await xapi.Command.Bookings.Book({
+        Duration: 30,
+        StartTime: new Date(2026, 3, 27, 12, 0, 0, 0).toISOString(),
+        Title: "Daily sync",
+      });
+
+      // Bookings accumulate in the array, sorted by start time.
+      expect(device.bookings.map((booking) => booking.title)).toEqual([
+        "Daily sync",
+        "Sprint planning",
+      ]);
+      expect(device.bookings.every((booking) => booking.state === "scheduled")).toBe(true);
+
+      // A future booking must not mark the room busy, but it should be reflected
+      // in the derived scheduler state straight away.
+      await expect(xapi.Status.Bookings.Availability.Status.get()).resolves.toBe("Available");
+      expect(device.scheduler).toMatchObject({
+        busy: false,
+        title: "Available until 12:00",
+        nextMeeting: "Daily sync",
+      });
     } finally {
       vi.useRealTimers();
     }

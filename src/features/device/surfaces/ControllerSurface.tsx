@@ -1,10 +1,18 @@
 import { useMemo } from "react";
 import type { DeviceState } from "../../../modules/types.ts";
 import {
+  describeBookingTiming,
+  formatBookingRange,
+  resolveRoomAvailability,
+} from "../../../modules/bookings/availability.ts";
+import { getPanelsForSurface } from "../../../modules/devices/panelLocations.ts";
+import {
   CONTROLLER_NATIVE_ACTIONS,
   getSurfaceActionFromPanel,
 } from "../../../modules/devices/surfaceActionButtons.ts";
+import { getVisibleNativeActions } from "../../../modules/devices/uiFeatures.ts";
 import { Icon } from "../../../components/Icon.tsx";
+import { MeetingPlatformIcon } from "./MeetingPlatformIcon.tsx";
 import { RoundActionButton } from "./RoundActionButton.tsx";
 
 interface ControllerSurfaceProps {
@@ -23,14 +31,25 @@ function formatControllerDate(date: Date): string {
 
 export function ControllerSurface({ device, onSelectPanel, onDismissAlert }: ControllerSurfaceProps) {
   const now = new Date();
+  const inCall = device.call?.active ?? false;
   const customActions = useMemo(
-    () => device.panels.map(getSurfaceActionFromPanel),
-    [device.panels],
+    () => getPanelsForSurface(device.panels, "controller", { inCall }).map(getSurfaceActionFromPanel),
+    [device.panels, inCall],
+  );
+  const nativeActions = useMemo(
+    () => getVisibleNativeActions(CONTROLLER_NATIVE_ACTIONS, device.config),
+    [device.config],
   );
   const actions = useMemo(
-    () => [...CONTROLLER_NATIVE_ACTIONS, ...customActions].slice(0, 9),
-    [customActions],
+    () => [...nativeActions, ...customActions].slice(0, 9),
+    [nativeActions, customActions],
   );
+  const availability = resolveRoomAvailability(device.bookings, now);
+  // The Navigator features the meeting in progress, or the next one due today.
+  const featuredBooking = availability.current ?? availability.next;
+  const moreMeetings = availability.current
+    ? availability.upcomingToday.length
+    : Math.max(0, availability.upcomingToday.length - 1);
 
   return (
     <div className="device-card controller-card">
@@ -52,6 +71,41 @@ export function ControllerSurface({ device, onSelectPanel, onDismissAlert }: Con
               </div>
               <div data-controller-date className="controller-date">
                 {formatControllerDate(now)}
+              </div>
+
+              <div
+                data-controller-availability={availability.state}
+                className="controller-booking-panel"
+              >
+                {featuredBooking ? (
+                  <>
+                    <div data-controller-booking-timing className="controller-booking-timing">
+                      {describeBookingTiming(featuredBooking, now)}
+                    </div>
+                    <div data-controller-booking-state className="controller-booking-title">
+                      {featuredBooking.title}
+                    </div>
+                    <div data-controller-booking-organizer className="controller-booking-organizer">
+                      Organizer: {featuredBooking.organizerName}
+                    </div>
+                    <div className="controller-booking-range">
+                      <MeetingPlatformIcon platform={featuredBooking.meetingPlatform} />
+                      <span data-controller-booking-range>{formatBookingRange(featuredBooking)}</span>
+                    </div>
+                    {moreMeetings > 0 ? (
+                      <div data-controller-booking-more className="controller-booking-more">
+                        <Icon name="icon-calendar-empty-regular" />
+                        <span>
+                          {moreMeetings} more meeting{moreMeetings === 1 ? "" : "s"} today
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div data-controller-booking-state className="controller-booking-title">
+                    Room available all day
+                  </div>
+                )}
               </div>
             </div>
 

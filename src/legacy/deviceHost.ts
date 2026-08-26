@@ -1,10 +1,13 @@
 import { createDeviceActions } from "../modules/app/index.ts";
+import { applyUiFeatureDefaults } from "../modules/devices/uiFeatures.ts";
 import type { DevicePanel, DeviceState } from "../modules/types.ts";
+import { onXapiSchemaReady } from "./monacoHost.ts";
 import type { AppStoreBridge } from "../features/app/appStoreBridge.ts";
 import { simulatorDeviceRuntime } from "../features/app/simulatorDevice.ts";
 import type { AppAction } from "../features/app/types.ts";
 import { createXapiFacade } from "../modules/xapi/facade.ts";
 import type { XapiFacade } from "../modules/xapi/facade.ts";
+import type { XapiSchemaBundle, XapiSchemaNode } from "../modules/xapi/schema.ts";
 
 type DeviceActions = ReturnType<typeof createDeviceActions>;
 
@@ -14,6 +17,8 @@ let activeXapiFacade: XapiFacade | null = null;
 let addLogFn: ((message: string, level?: string) => void) | null = null;
 let getSelectedProductIdFn: (() => string | null) | null = null;
 let getSelectedProductNameFn: (() => string) | null = null;
+let disposeSchemaListener: (() => void) | null = null;
+let latestConfigRoot: XapiSchemaNode | null = null;
 
 const deviceRuntime = simulatorDeviceRuntime;
 
@@ -56,6 +61,11 @@ function renderFromRuntime(): void {
   setActiveDeviceState(deviceRuntime.getState());
 }
 
+/** Restores the schema-defined UserInterface.Features starting point. */
+function seedUiFeatureDefaults(): boolean {
+  return applyUiFeatureDefaults(deviceRuntime.getState(), latestConfigRoot);
+}
+
 export const registerDeviceHost = {
   mount(options: {
     store: AppStoreBridge;
@@ -75,6 +85,16 @@ export const registerDeviceHost = {
       onDeviceChange: setActiveDeviceState,
     });
 
+    // The surfaces read UserInterface.Features straight off the device, so the
+    // schema defaults have to land before any macro runs.
+    disposeSchemaListener?.();
+    disposeSchemaListener = onXapiSchemaReady((schemaBundle) => {
+      latestConfigRoot = schemaBundle.roots?.configRoot ?? null;
+      if (seedUiFeatureDefaults()) {
+        renderFromRuntime();
+      }
+    });
+
     renderFromRuntime();
   },
 
@@ -91,6 +111,10 @@ export const registerDeviceHost = {
   reset(): void {
     activeXapiFacade = null;
     deviceActions?.reset();
+    // reset() clears the device, so put the feature defaults back.
+    if (seedUiFeatureDefaults()) {
+      renderFromRuntime();
+    }
   },
 
   getRuntime() {
@@ -104,7 +128,7 @@ export const registerDeviceHost = {
   createXapiFacade(
     addLog: (message: string, level?: string) => void,
     renderDevice: () => void,
-    schemaBundle: Awaited<ReturnType<typeof import("../modules/editor/xapiIntellisense.ts")["installXapiIntellisense"]>> | null,
+    schemaBundle: XapiSchemaBundle | null,
   ): XapiFacade {
     activeXapiFacade = createXapiFacade({
       device: deviceRuntime.getState(),

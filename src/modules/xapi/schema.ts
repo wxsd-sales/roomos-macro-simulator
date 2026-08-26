@@ -3,9 +3,10 @@ export const SCHEMAS_INDEX_URL =
 export const SCHEMA_BASE_URL =
   "https://raw.githubusercontent.com/cisco-ce/roomos.cisco.com/master/schemas";
 
-type SchemaValue = unknown;
+export type XapiKind = "Command" | "Status" | "Config" | "Event";
+export type SchemaPath = string | Array<string | number | null | undefined>;
+
 type SchemaRecord = Record<string, any>;
-type SchemaPath = string | Array<string | number | null | undefined>;
 
 interface SchemaManifestEntry extends SchemaRecord {
   name?: string;
@@ -18,66 +19,389 @@ interface SchemaManifestEntry extends SchemaRecord {
   date?: string | number;
 }
 
-interface SchemaRoots {
-  commandRoot: SchemaRecord | null;
-  statusRoot: SchemaRecord | null;
-  eventRoot: SchemaRecord | null;
+/** Canonical valuespace, normalized from the several shapes the upstream schema uses. */
+export interface XapiValuespace {
+  type: string;
+  Values?: string[];
+  Min?: number;
+  Max?: number;
+  MinLength?: number;
+  MaxLength?: number;
 }
 
-interface FlatSchemaObject extends SchemaRecord {
-  type?: string;
-  path?: string;
-  normPath?: string;
+/** A single command argument. */
+export interface XapiParam {
+  name: string;
+  required: boolean;
+  description?: string;
+  valuespace: XapiValuespace | null;
+}
+
+/** A field on an event payload. Payload fields nest and may repeat. */
+export interface XapiPayloadField {
+  required: boolean;
+  multiple: boolean;
+  valuespace: XapiValuespace | null;
+  children?: Record<string, XapiPayloadField>;
+}
+
+/**
+ * One node in a kind tree. Children live under `children` so that schema
+ * metadata can never be mistaken for a path segment.
+ */
+export interface XapiSchemaNode {
+  children: Record<string, XapiSchemaNode>;
+  /** True when the upstream segment was indexed, e.g. `Connector[n]` or `ARC[1..3]`. */
+  indexed: boolean;
+  /** True when a command/status/config/event actually terminates here. */
+  leaf: boolean;
+  description?: string;
   products?: string[];
-  attributes?: {
-    description?: string;
-    include_for_extension?: unknown;
-    params?: Array<SchemaRecord & { name?: string }>;
-  };
+  /** Value type for Status and Config leaves. */
+  valuespace?: XapiValuespace | null;
+  /** Default value for Config leaves. */
+  defaultValue?: string;
+  /** Arguments for Command leaves. */
+  params?: Record<string, XapiParam>;
+  /** Payload shape for Event leaves. */
+  payload?: Record<string, XapiPayloadField>;
 }
 
-const METADATA_KEYS = new Set([
-  "description",
-  "docs",
-  "documentation",
-  "example",
-  "examples",
-  "id",
-  "name",
-  "title",
-  "type",
-  "format",
-  "default",
-  "required",
-  "deprecated",
-  "enum",
-  "values",
-  "minimum",
-  "maximum",
-  "min",
-  "max",
-  "readOnly",
-  "writeOnly",
-  "optional",
-  "kind",
-  "lastUpdate",
-  "lastUpdated",
-  "version",
-  "path",
-  "xpath",
-  "url",
-  "products",
-  "includeForExtension",
-  "$schema",
-  "$id",
-  "$ref",
-]);
+export interface SchemaRoots {
+  commandRoot: XapiSchemaNode | null;
+  statusRoot: XapiSchemaNode | null;
+  configRoot: XapiSchemaNode | null;
+  eventRoot: XapiSchemaNode | null;
+}
 
-export function isPlainObject(value: SchemaValue): value is SchemaRecord {
+export interface XapiSchemaBundle {
+  schemaName: string;
+  roots: SchemaRoots;
+}
+
+/** Normalized schema object, the common currency between all three sources. */
+interface XapiSchemaObject {
+  kind: XapiKind;
+  path: string;
+  products?: string[];
+  description?: string;
+  valuespace?: XapiValuespace | null;
+  defaultValue?: string;
+  params?: XapiParam[];
+  payload?: Record<string, XapiPayloadField>;
+}
+
+const KIND_BY_UPSTREAM_TYPE: Record<string, XapiKind> = {
+  Command: "Command",
+  Status: "Status",
+  Configuration: "Config",
+  Config: "Config",
+  Event: "Event",
+};
+
+const INDEXED_SEGMENT = /^(.+?)\[[^\]]*\]$/;
+
+export function isPlainObject(value: unknown): value is SchemaRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export function normalizeSchemaEntries(payload: SchemaValue): SchemaManifestEntry[] {
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function toStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || !value.length) {
+    return undefined;
+  }
+  return [...new Set(value.map(String))];
+}
+
+/**
+ * Upstream expresses valuespaces two ways: an object (commands, statuses,
+ * configurations) and a bare type string with a sibling `values` array
+ * (event payload fields).
+ */
+export function normalizeValuespace(raw: unknown, siblingValues?: unknown): XapiValuespace | null {
+  if (typeof raw === "string") {
+    const values = toStringArray(siblingValues);
+    return { type: raw, ...(values ? { Values: values } : {}) };
+  }
+
+  if (!isPlainObject(raw)) {
+    return null;
+  }
+
+  const type = String(raw.type ?? "").trim();
+  const values = toStringArray(raw.Values ?? raw.values ?? siblingValues);
+
+  return {
+    type,
+    ...(values ? { Values: values } : {}),
+    ...(toOptionalNumber(raw.Min ?? raw.minimum) !== undefined
+      ? { Min: toOptionalNumber(raw.Min ?? raw.minimum) }
+      : {}),
+    ...(toOptionalNumber(raw.Max ?? raw.maximum) !== undefined
+      ? { Max: toOptionalNumber(raw.Max ?? raw.maximum) }
+      : {}),
+    ...(toOptionalNumber(raw.MinLength) !== undefined
+      ? { MinLength: toOptionalNumber(raw.MinLength) }
+      : {}),
+    ...(toOptionalNumber(raw.MaxLength) !== undefined
+      ? { MaxLength: toOptionalNumber(raw.MaxLength) }
+      : {}),
+  };
+}
+
+function normalizePayloadFields(raw: unknown): Record<string, XapiPayloadField> | undefined {
+  if (!isPlainObject(raw)) {
+    return undefined;
+  }
+
+  const fields: Record<string, XapiPayloadField> = {};
+  Object.entries(raw).forEach(([name, value]) => {
+    if (!isPlainObject(value)) {
+      return;
+    }
+
+    const children = normalizePayloadFields(value.children);
+    fields[name] = {
+      required: value.required === true,
+      multiple: value.multiple === true,
+      valuespace: children ? null : normalizeValuespace(value.valuespace, value.values),
+      ...(children ? { children } : {}),
+    };
+  });
+
+  return Object.keys(fields).length ? fields : undefined;
+}
+
+function normalizeParams(raw: unknown): XapiParam[] | undefined {
+  if (!Array.isArray(raw) || !raw.length) {
+    return undefined;
+  }
+
+  const params = raw
+    .filter((param) => isPlainObject(param) && param.name)
+    .map((param) => ({
+      name: String(param.name),
+      required: param.required === true,
+      ...(param.description ? { description: String(param.description) } : {}),
+      valuespace: normalizeValuespace(param.valuespace),
+    }));
+
+  return params.length ? params : undefined;
+}
+
+function firstParagraph(value: unknown): string | undefined {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return undefined;
+  }
+  return text.split(/\n\s*\n/)[0].trim() || undefined;
+}
+
+/**
+ * Accepts either the upstream Cisco format (`{ objects: [{ type, path,
+ * products, attributes }] }`) or the compact vendored format written by
+ * `scripts/update-xapi-schema.mts`.
+ */
+export function normalizeSchemaObjects(payload: unknown): XapiSchemaObject[] {
+  if (!isPlainObject(payload) || !Array.isArray(payload.objects)) {
+    return [];
+  }
+
+  const productDictionary = Array.isArray(payload.products) ? payload.products.map(String) : null;
+  const objects: XapiSchemaObject[] = [];
+
+  payload.objects.forEach((entry: unknown) => {
+    if (!isPlainObject(entry)) {
+      return;
+    }
+
+    const kind = KIND_BY_UPSTREAM_TYPE[String(entry.type ?? entry.t ?? "")];
+    const path = String(entry.path ?? entry.p ?? entry.normPath ?? "").trim();
+    if (!kind || !path) {
+      return;
+    }
+
+    const attributes = isPlainObject(entry.attributes) ? entry.attributes : {};
+
+    const rawProducts = entry.products ?? entry.r;
+    let products: string[] | undefined;
+    if (Array.isArray(rawProducts)) {
+      products = productDictionary
+        ? rawProducts
+            .map((index: unknown) =>
+              typeof index === "number" ? productDictionary[index] : String(index),
+            )
+            .filter(Boolean)
+        : rawProducts.map(String);
+    }
+
+    objects.push({
+      kind,
+      path,
+      ...(products?.length ? { products } : {}),
+      ...(firstParagraph(attributes.description ?? entry.d)
+        ? { description: firstParagraph(attributes.description ?? entry.d) }
+        : {}),
+      valuespace: normalizeValuespace(attributes.valuespace ?? entry.v),
+      ...(attributes.default ?? entry.x
+        ? { defaultValue: String(attributes.default ?? entry.x) }
+        : {}),
+      ...(normalizeParams(attributes.params ?? entry.a)
+        ? { params: normalizeParams(attributes.params ?? entry.a) }
+        : {}),
+      ...(normalizePayloadFields(attributes.children ?? entry.c)
+        ? { payload: normalizePayloadFields(attributes.children ?? entry.c) }
+        : {}),
+    });
+  });
+
+  return objects;
+}
+
+function createNode(): XapiSchemaNode {
+  return { children: {}, indexed: false, leaf: false };
+}
+
+export function splitSchemaPath(path: unknown): string[] {
+  return String(path ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+export function splitXapiPath(path: SchemaPath): string[] {
+  if (Array.isArray(path)) {
+    return path.filter((segment) => segment !== null && segment !== undefined && segment !== "").map(String);
+  }
+
+  return String(path ?? "")
+    .trim()
+    .split(/[.\s]+/)
+    .filter(Boolean);
+}
+
+/** Splits `Connector[n]` into its dot-addressable name plus an indexed marker. */
+export function parseSegment(segment: string): { name: string; indexed: boolean } {
+  const match = INDEXED_SEGMENT.exec(segment);
+  return match ? { name: match[1], indexed: true } : { name: segment, indexed: false };
+}
+
+function ensureNode(root: XapiSchemaNode, segments: string[]): XapiSchemaNode {
+  let current = root;
+
+  segments.forEach((segment) => {
+    const { name, indexed } = parseSegment(segment);
+    if (!current.children[name]) {
+      current.children[name] = createNode();
+    }
+    current = current.children[name];
+    if (indexed) {
+      current.indexed = true;
+    }
+  });
+
+  return current;
+}
+
+function applyObjectToNode(node: XapiSchemaNode, object: XapiSchemaObject): void {
+  node.leaf = true;
+
+  if (object.description && object.description.length > (node.description?.length ?? 0)) {
+    node.description = object.description;
+  }
+  if (object.products?.length) {
+    node.products = object.products;
+  }
+  if (object.valuespace) {
+    node.valuespace = object.valuespace;
+  }
+  if (object.defaultValue !== undefined) {
+    node.defaultValue = object.defaultValue;
+  }
+  if (object.payload) {
+    node.payload = { ...node.payload, ...object.payload };
+  }
+  if (object.params) {
+    node.params = node.params ?? {};
+    object.params.forEach((param) => {
+      node.params![param.name] = param;
+    });
+  }
+}
+
+export function buildSchemaRoots(payload: unknown): SchemaRoots {
+  const trees: Record<XapiKind, XapiSchemaNode> = {
+    Command: createNode(),
+    Status: createNode(),
+    Config: createNode(),
+    Event: createNode(),
+  };
+
+  normalizeSchemaObjects(payload).forEach((object) => {
+    const segments = splitSchemaPath(object.path);
+    if (!segments.length) {
+      return;
+    }
+    applyObjectToNode(ensureNode(trees[object.kind], segments), object);
+  });
+
+  const used = (node: XapiSchemaNode) => (Object.keys(node.children).length ? node : null);
+
+  return {
+    commandRoot: used(trees.Command),
+    statusRoot: used(trees.Status),
+    configRoot: used(trees.Config),
+    eventRoot: used(trees.Event),
+  };
+}
+
+/** Kept as the public name used across the app and tests. */
+export const resolveSchemaRoots = buildSchemaRoots;
+
+/**
+ * Walks a kind tree. Numeric segments are consumed by indexed nodes so that a
+ * runtime path such as `Audio.Input.Connectors.Ethernet.1.Mute` — produced when
+ * a macro writes `Ethernet[1]` — resolves against `Ethernet[n]` in the schema.
+ */
+export function findNodeByPath(
+  root: XapiSchemaNode | null | undefined,
+  path: SchemaPath,
+): XapiSchemaNode | null {
+  let current = root ?? null;
+
+  for (const segment of splitXapiPath(path)) {
+    if (!current) {
+      return null;
+    }
+
+    if (current.indexed && /^\d+$/.test(segment)) {
+      continue;
+    }
+
+    current = current.children[segment] ?? null;
+  }
+
+  return current;
+}
+
+export function getCommandParams(node: XapiSchemaNode | null | undefined): XapiParam[] {
+  return node?.params ? Object.values(node.params) : [];
+}
+
+export function getChildEntries(
+  node: XapiSchemaNode | null | undefined,
+): [string, XapiSchemaNode][] {
+  return node ? Object.entries(node.children) : [];
+}
+
+export function normalizeSchemaEntries(payload: unknown): SchemaManifestEntry[] {
   if (Array.isArray(payload)) {
     return payload.filter(isPlainObject);
   }
@@ -91,12 +415,9 @@ export function normalizeSchemaEntries(payload: SchemaValue): SchemaManifestEntr
   }
 
   if (isPlainObject(payload)) {
-    return Object.entries(payload).map(([name, value]) => {
-      if (isPlainObject(value)) {
-        return { name, ...value };
-      }
-      return { name, value };
-    });
+    return Object.entries(payload).map(([name, value]) =>
+      isPlainObject(value) ? { name, ...value } : { name, value },
+    );
   }
 
   return [];
@@ -119,13 +440,7 @@ function parseTimestamp(value: unknown): number {
 export function resolveLatestSchemaName(entries: SchemaManifestEntry[]): string | null {
   const enriched = entries
     .map((entry) => ({
-      ...entry,
-      schemaName:
-        entry.name ??
-        entry.schemaName ??
-        entry.schema ??
-        entry.version ??
-        entry.title,
+      schemaName: entry.name ?? entry.schemaName ?? entry.schema ?? entry.version ?? entry.title,
       timestamp: parseTimestamp(entry.lastUpdate ?? entry.lastUpdated ?? entry.date),
     }))
     .filter((entry) => entry.schemaName);
@@ -144,250 +459,14 @@ export function getSchemaUrl(schemaName: string): string {
   return `${SCHEMA_BASE_URL}/${encodeURIComponent(schemaName)}.json`;
 }
 
-export function collectChildEntries(node: SchemaValue): [string, SchemaRecord][] {
-  if (!isPlainObject(node)) {
-    return [];
-  }
-
-  return Object.entries(node).filter(([key, value]) => {
-    if (METADATA_KEYS.has(key)) {
-      return false;
-    }
-
-    if (key.startsWith("_")) {
-      return false;
-    }
-
-    if (value == null) {
-      return false;
-    }
-
-    return typeof value === "object";
-  }) as [string, SchemaRecord][];
-}
-
-function findLikelyRootNode(
-  schema: SchemaValue,
-  matcher: (key: string, value: SchemaRecord) => boolean,
-): SchemaRecord | null {
-  const queue = [{ key: "root", value: schema }];
-
-  while (queue.length) {
-    const current = queue.shift();
-    if (!current || !isPlainObject(current.value)) {
-      continue;
-    }
-
-    if (matcher(current.key, current.value)) {
-      return current.value;
-    }
-
-    collectChildEntries(current.value).forEach(([key, value]) => {
-      queue.push({ key, value });
-    });
-  }
-
-  return null;
-}
-
-export function findNodeByPath(root: SchemaValue, path: SchemaPath): SchemaRecord | null {
-  let current = root;
-
-  for (const segment of splitXapiPath(path)) {
-    if (!isPlainObject(current)) {
-      return null;
-    }
-    current = current[segment];
-  }
-
-  return current ?? null;
-}
-
-export function splitXapiPath(path: SchemaPath): string[] {
-  if (Array.isArray(path)) {
-    return path.filter(Boolean).map(String);
-  }
-
-  return String(path ?? "")
-    .trim()
-    .split(/[.\s]+/)
-    .filter(Boolean);
-}
-
-function splitSchemaPath(path: unknown): string[] {
-  return String(path ?? "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function ensureTreePath(root: SchemaRecord, path: string[]): SchemaRecord {
-  let current = root;
-
-  path.forEach((segment) => {
-    if (!isPlainObject(current[segment])) {
-      current[segment] = {};
-    }
-    current = current[segment];
-  });
-
-  return current;
-}
-
-function mergeDescription(target: unknown, incoming: unknown): string {
-  const next = String(incoming ?? "").trim();
-  if (!next) {
-    return String(target ?? "");
-  }
-
-  if (!target) {
-    return next;
-  }
-
-  const current = String(target);
-  return next.length > current.length ? next : current;
-}
-
-function mergeValuespace(existing: unknown, incoming: unknown): SchemaRecord | null {
-  if (!isPlainObject(incoming)) {
-    return isPlainObject(existing) ? existing : null;
-  }
-
-  if (!isPlainObject(existing)) {
-    return { ...incoming };
-  }
-
-  const merged = { ...existing, ...incoming };
-  const existingValues = Array.isArray(existing.Values) ? existing.Values : [];
-  const incomingValues = Array.isArray(incoming.Values) ? incoming.Values : [];
-
-  if (existingValues.length || incomingValues.length) {
-    merged.Values = [...new Set([...existingValues, ...incomingValues])];
-  }
-
-  return merged;
-}
-
-function mergeParamNode(existing: unknown, param: SchemaRecord): SchemaRecord {
-  const next = isPlainObject(existing) ? existing : {};
-
-  next.description = mergeDescription(next.description, param?.description);
-  next.required =
-    next.required === undefined ? param?.required === true : next.required && param?.required === true;
-  next.valuespace = mergeValuespace(next.valuespace, param?.valuespace);
-
-  return next;
-}
-
-function addFlatObjectToTree(root: SchemaRecord, object: FlatSchemaObject): void {
-  const path = splitSchemaPath(object?.path ?? object?.normPath);
-  if (!path.length) {
-    return;
-  }
-
-  const leaf = ensureTreePath(root, path);
-  leaf.description = mergeDescription(leaf.description, object?.attributes?.description);
-  leaf.products = Array.isArray(object?.products) ? object.products : leaf.products;
-  leaf.includeForExtension = object?.attributes?.include_for_extension ?? leaf.includeForExtension;
-
-  const params = Array.isArray(object?.attributes?.params) ? object.attributes.params : [];
-  if (!params.length) {
-    return;
-  }
-
-  if (!isPlainObject(leaf.Params)) {
-    leaf.Params = {};
-  }
-
-  params.forEach((param) => {
-    if (!param?.name) {
-      return;
-    }
-    leaf.Params[param.name] = mergeParamNode(leaf.Params[param.name], param);
-  });
-}
-
-function buildRootsFromFlatSchema(schema: SchemaRecord): SchemaRoots {
-  const commandRoot = {};
-  const statusRoot = {};
-  const eventRoot = {};
-  const objects = Array.isArray(schema?.objects) ? schema.objects as FlatSchemaObject[] : [];
-
-  objects.forEach((object) => {
-    switch (object?.type) {
-      case "Command":
-        addFlatObjectToTree(commandRoot, object);
-        break;
-      case "Status":
-        addFlatObjectToTree(statusRoot, object);
-        break;
-      case "Event":
-        addFlatObjectToTree(eventRoot, object);
-        break;
-      default:
-        break;
-    }
-  });
-
-  return {
-    commandRoot: Object.keys(commandRoot).length ? commandRoot : null,
-    statusRoot: Object.keys(statusRoot).length ? statusRoot : null,
-    eventRoot: Object.keys(eventRoot).length ? eventRoot : null,
-  };
-}
-
-export function resolveSchemaRoots(schema: SchemaValue): SchemaRoots {
-  if (isPlainObject(schema) && Array.isArray(schema.objects)) {
-    return buildRootsFromFlatSchema(schema);
-  }
-
-  return {
-    commandRoot:
-      findLikelyRootNode(schema, (key) => /^(x)?command$/i.test(key)) ??
-      findLikelyRootNode(schema, (key) => key === "Commands"),
-    statusRoot:
-      findLikelyRootNode(schema, (key) => /^(x)?status$/i.test(key)) ??
-      findLikelyRootNode(schema, (key) => key === "Status"),
-    eventRoot:
-      findLikelyRootNode(schema, (key) => /^(x)?event$/i.test(key) || /^(x)?feedback$/i.test(key)) ??
-      findLikelyRootNode(schema, (key) => key === "Events"),
-  };
-}
-
-export function collectPayloadShape(node: SchemaValue): [string, SchemaRecord][] {
-  if (!isPlainObject(node)) {
-    return [];
-  }
-
-  const candidateKeys = ["Params", "Parameters", "Arguments", "Args", "Input", "Payload"];
-  for (const key of candidateKeys) {
-    const value = node[key];
-    if (isPlainObject(value)) {
-      return collectChildEntries(value);
-    }
-  }
-
-  const children = collectChildEntries(node);
-  return children.filter(([key]) => /^[a-z]/.test(key));
-}
-
-export function collectBranchEntries(node: SchemaValue): [string, SchemaRecord][] {
-  const payloadContainers = new Set(["Params", "Parameters", "Arguments", "Args", "Input", "Payload"]);
-  return collectChildEntries(node).filter(([key]) => !payloadContainers.has(key));
-}
-
-export async function loadLatestXapiSchema(): Promise<{
-  schemaName: string;
-  schema: SchemaValue;
-  roots: SchemaRoots;
-}> {
+/** Resolves the newest schema name from the Cisco index, then fetches it. */
+export async function fetchLatestXapiSchema(): Promise<{ schemaName: string; payload: unknown }> {
   const manifestResponse = await fetch(SCHEMAS_INDEX_URL);
   if (!manifestResponse.ok) {
     throw new Error(`Unable to load Cisco schemas index (${manifestResponse.status})`);
   }
 
-  const manifestPayload = await manifestResponse.json();
-  const schemaName = resolveLatestSchemaName(normalizeSchemaEntries(manifestPayload));
+  const schemaName = resolveLatestSchemaName(normalizeSchemaEntries(await manifestResponse.json()));
   if (!schemaName) {
     throw new Error("Unable to resolve latest Cisco schema name from schemas index");
   }
@@ -397,12 +476,5 @@ export async function loadLatestXapiSchema(): Promise<{
     throw new Error(`Unable to load Cisco schema "${schemaName}" (${schemaResponse.status})`);
   }
 
-  const schema = await schemaResponse.json();
-  const roots = resolveSchemaRoots(schema);
-
-  return {
-    schemaName,
-    schema,
-    roots,
-  };
+  return { schemaName, payload: await schemaResponse.json() };
 }

@@ -1,10 +1,18 @@
 import { useMemo } from "react";
 import type { DeviceState } from "../../../modules/types.ts";
 import {
+  describeBookingTiming,
+  formatBookingRange,
+  resolveRoomAvailability,
+} from "../../../modules/bookings/availability.ts";
+import { getPanelsForSurface } from "../../../modules/devices/panelLocations.ts";
+import {
   getSurfaceActionFromPanel,
   OSD_NATIVE_ACTIONS,
 } from "../../../modules/devices/surfaceActionButtons.ts";
+import { getVisibleNativeActions } from "../../../modules/devices/uiFeatures.ts";
 import { Icon } from "../../../components/Icon.tsx";
+import { MeetingPlatformIcon } from "./MeetingPlatformIcon.tsx";
 import { RoundActionButton } from "./RoundActionButton.tsx";
 
 interface OsdSurfaceProps {
@@ -13,11 +21,23 @@ interface OsdSurfaceProps {
 }
 
 export function OsdSurface({ device, onSelectPanel }: OsdSurfaceProps) {
-  const clock = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const actions = useMemo(
-    () => [...OSD_NATIVE_ACTIONS, ...device.panels.map(getSurfaceActionFromPanel)].slice(0, 16),
-    [device.panels],
+  const now = new Date();
+  const clock = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const inCall = device.call?.active ?? false;
+  const visiblePanels = useMemo(
+    () => getPanelsForSurface(device.panels, "osd", { inCall }),
+    [device.panels, inCall],
   );
+  const nativeActions = useMemo(
+    () => getVisibleNativeActions(OSD_NATIVE_ACTIONS, device.config),
+    [device.config],
+  );
+  const actions = useMemo(
+    () => [...nativeActions, ...visiblePanels.map(getSurfaceActionFromPanel)].slice(0, 16),
+    [nativeActions, visiblePanels],
+  );
+  const availability = resolveRoomAvailability(device.bookings, now);
+  const currentBooking = availability.current;
 
   return (
     <div className="device-card osd-card">
@@ -51,7 +71,7 @@ export function OsdSurface({ device, onSelectPanel }: OsdSurfaceProps) {
                 const isActive =
                   device.activePanel === action.id ||
                   device.activePanel === action.label ||
-                  (!device.panels.length && action.id === "native-call");
+                  (!visiblePanels.length && action.id === "native-call");
 
                 return (
                   <RoundActionButton
@@ -72,6 +92,39 @@ export function OsdSurface({ device, onSelectPanel }: OsdSurfaceProps) {
                 );
               })}
             </div>
+          </div>
+
+          <div
+            data-osd-availability={availability.state}
+            className="osd-booking-panel"
+          >
+            <span className="osd-booking-icon" aria-hidden="true">
+              <Icon name={currentBooking ? "icon-meetings-regular" : "icon-calendar-add-regular"} />
+            </span>
+            {currentBooking ? (
+              <div className="osd-booking-copy">
+                <span data-osd-booking-timing className="osd-booking-timing">
+                  {describeBookingTiming(currentBooking, now)}
+                </span>
+                <span data-osd-booking-state className="osd-booking-headline">
+                  {currentBooking.title}
+                </span>
+                <span className="osd-booking-meta">
+                  <MeetingPlatformIcon platform={currentBooking.meetingPlatform} />
+                  <span data-osd-booking-range>{formatBookingRange(currentBooking)}</span>
+                </span>
+              </div>
+            ) : (
+              <div className="osd-booking-copy">
+                <span data-osd-booking-state className="osd-booking-headline">
+                  {availability.state === "available" ? "Room available all day" : availability.headline}
+                </span>
+                <button className="osd-booking-action" type="button" tabIndex={-1}>
+                  <Icon name="icon-calendar-add-regular" />
+                  <span>Book room</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="osd-page-indicator" aria-hidden="true">

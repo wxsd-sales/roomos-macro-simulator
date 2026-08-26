@@ -52,6 +52,7 @@ body {
   --device-text: #000000;
   --device-text-secondary: rgba(0, 0, 0, 0.72);
   --device-text-shadow: none;
+  --device-meeting-accent: #0a6b3d;
   --device-control-bg: rgba(5, 10, 22, 0.42);
   --device-control-border: rgba(255, 255, 255, 0.22);
   --device-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 16px rgba(4, 8, 18, 0.1);
@@ -77,6 +78,7 @@ body {
   --device-text: #ffffff;
   --device-text-secondary: rgba(255, 255, 255, 0.92);
   --device-text-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
+  --device-meeting-accent: #7ff0b0;
   --device-wallpaper: url("./assets/wallpapers/eveningfjord.jpeg");
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
   --shadow-raised: 0 14px 32px rgba(0, 0, 0, 0.36);
@@ -900,13 +902,14 @@ body.is-resizing {
   letter-spacing: 0.01em;
 }
 
+/* Anchored right so the booking panel owns the left of the stage. */
 .osd-actions-shell {
   position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -48%);
+  inset: 50% clamp(14px, 3cqi, 38px) auto auto;
+  transform: translateY(-48%);
   z-index: 1;
-  width: min(72cqi, 680px);
-  max-width: calc(100% - 96px);
+  width: min(56cqi, 520px);
+  max-width: calc(100% - 32cqi);
 }
 
 .osd-actions-grid {
@@ -1236,7 +1239,7 @@ body.is-resizing {
   inset: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   padding: clamp(22px, 4.5cqi, 44px);
   gap: clamp(12px, 2.6cqi, 26px);
@@ -1252,7 +1255,7 @@ body.is-resizing {
 }
 
 .controller-time {
-  font-size: clamp(1.7rem, 8.6cqi, 4.1rem);
+  font-size: clamp(1.5rem, 7cqi, 3.3rem);
   font-weight: 300;
   letter-spacing: -0.05em;
   line-height: 0.95;
@@ -1649,10 +1652,219 @@ body.is-resizing {
   font-size: clamp(0.92rem, 2cqi, 1.08rem);
 }
 
+/* Bookings and room availability ------------------------------------------ */
+
+.meeting-platform-icon {
+  width: clamp(0.95rem, 2.4cqi, 1.35rem);
+  height: clamp(0.95rem, 2.4cqi, 1.35rem);
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Room Scheduler switches from green to a warm gradient once the room is booked. */
+.scheduler-stage.booked {
+  background:
+    radial-gradient(circle at bottom right, rgba(255, 138, 92, 0.46), transparent 34%),
+    radial-gradient(circle at top left, rgba(126, 66, 214, 0.56), transparent 32%),
+    linear-gradient(135deg, #3a1250 0%, #7b1f46 54%, #bc3a3f 100%);
+}
+
+.scheduler-stage.booked .scheduler-room-panel {
+  background:
+    radial-gradient(circle at bottom left, rgba(214, 96, 122, 0.22), transparent 40%),
+    linear-gradient(160deg, #2b1035 0%, #43163a 100%);
+}
+
+.scheduler-stage.booked .scheduler-room-icon {
+  background: #f2664b;
+}
+
+.scheduler-stage.booked .scheduler-custom-panel {
+  background:
+    radial-gradient(circle at bottom left, rgba(233, 122, 143, 0.22), transparent 42%),
+    linear-gradient(160deg, rgba(70, 24, 74, 0.84) 0%, rgba(104, 36, 66, 0.86) 100%);
+}
+
+.scheduler-stage.booked .scheduler-right-column {
+  background:
+    radial-gradient(circle at top left, rgba(58, 15, 64, 0.86), transparent 28%),
+    linear-gradient(135deg, rgba(129, 38, 72, 0.94) 0%, rgba(160, 52, 66, 0.96) 100%);
+}
+
+.scheduler-meeting {
+  display: grid;
+  justify-items: start;
+  gap: clamp(8px, 1.4cqi, 14px);
+  min-width: 0;
+}
+
+.scheduler-meeting-timing {
+  color: rgba(255, 250, 240, 0.86);
+  font-size: clamp(0.74rem, 1.9cqi, 1.02rem);
+  font-weight: 500;
+}
+
+.scheduler-meeting .scheduler-availability-text {
+  font-weight: 700;
+}
+
+.scheduler-meeting-organizer {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(8px, 1.4cqi, 12px);
+  padding: clamp(8px, 1.4cqi, 12px) clamp(12px, 1.8cqi, 16px);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.13);
+  color: #fff;
+  max-width: 100%;
+}
+
+.scheduler-meeting-organizer-copy {
+  display: grid;
+  gap: 2px;
+  font-size: clamp(0.68rem, 1.65cqi, 0.9rem);
+  min-width: 0;
+}
+
+/* OSD availability banner */
+.osd-booking-panel {
+  position: absolute;
+  inset: 50% auto auto clamp(16px, 3.2cqi, 38px);
+  transform: translateY(-50%);
+  z-index: 1;
+  width: min(31cqi, 300px);
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(8px, 1.5cqi, 14px);
+  color: var(--device-text);
+  text-shadow: var(--device-text-shadow);
+}
+
+.osd-booking-icon {
+  width: clamp(30px, 5.4cqi, 46px);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.osd-booking-icon .momentum-icon {
+  width: clamp(0.85rem, 2.4cqi, 1.15rem);
+  height: clamp(0.85rem, 2.4cqi, 1.15rem);
+  font-size: clamp(0.85rem, 2.4cqi, 1.15rem);
+}
+
+.osd-booking-copy {
+  display: grid;
+  justify-items: start;
+  gap: clamp(5px, 1cqi, 10px);
+  min-width: 0;
+}
+
+.osd-booking-timing {
+  font-size: clamp(0.66rem, 1.7cqi, 0.92rem);
+  font-weight: 500;
+  opacity: 0.86;
+}
+
+.osd-booking-headline {
+  font-size: clamp(0.86rem, 2.4cqi, 1.3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.osd-booking-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(6px, 1.1cqi, 9px);
+  font-size: clamp(0.66rem, 1.7cqi, 0.92rem);
+  opacity: 0.92;
+}
+
+.osd-booking-action {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(6px, 1.1cqi, 9px);
+  min-height: clamp(28px, 4.6cqi, 40px);
+  padding: 0 clamp(12px, 1.8cqi, 18px);
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #09151e;
+  font-size: clamp(0.68rem, 1.6cqi, 0.9rem);
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: none;
+  cursor: default;
+}
+
+.osd-booking-action .momentum-icon {
+  width: clamp(0.78rem, 1.8cqi, 1rem);
+  height: clamp(0.78rem, 1.8cqi, 1rem);
+  font-size: clamp(0.78rem, 1.8cqi, 1rem);
+}
+
+/* Navigator meeting panel */
+.controller-booking-panel {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: clamp(3px, 0.7cqi, 6px);
+  margin-top: clamp(8px, 1.8cqi, 18px);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.controller-booking-timing {
+  color: var(--device-meeting-accent);
+  font-size: clamp(0.66rem, 1.7cqi, 0.92rem);
+  font-weight: 600;
+}
+
+.controller-booking-title {
+  font-size: clamp(0.88rem, 2.5cqi, 1.35rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.controller-booking-organizer,
+.controller-booking-range {
+  font-size: clamp(0.66rem, 1.7cqi, 0.9rem);
+  opacity: 0.92;
+}
+
+.controller-booking-range {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(6px, 1.1cqi, 9px);
+}
+
+.controller-booking-more {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(6px, 1.1cqi, 9px);
+  margin-top: clamp(6px, 1.2cqi, 12px);
+  padding: clamp(6px, 1.1cqi, 10px) clamp(10px, 1.6cqi, 16px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #09151e;
+  font-size: clamp(0.64rem, 1.55cqi, 0.86rem);
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.controller-booking-more .momentum-icon {
+  width: clamp(0.74rem, 1.7cqi, 0.95rem);
+  height: clamp(0.74rem, 1.7cqi, 0.95rem);
+  font-size: clamp(0.74rem, 1.7cqi, 0.95rem);
+}
+
 @container (max-width: 620px) {
   .osd-actions-shell {
-    width: min(76cqi, 560px);
-    max-width: calc(100% - 72px);
+    width: min(58cqi, 430px);
+    max-width: calc(100% - 30cqi);
   }
 
   .scheduler-layout {
@@ -1689,9 +1901,9 @@ body.is-resizing {
   }
 
   .osd-actions-shell {
-    width: min(82cqi, 420px);
-    max-width: calc(100% - 40px);
-    transform: translate(-50%, -44%);
+    width: min(60cqi, 340px);
+    max-width: calc(100% - 28cqi);
+    transform: translateY(-46%);
   }
 
   .controller-stage {
@@ -2121,8 +2333,8 @@ body.is-resizing {
   }
 
   .osd-actions-shell {
-    width: min(76vw, 540px);
-    transform: translate(-50%, -44%);
+    width: min(58vw, 420px);
+    transform: translateY(-46%);
   }
 
   .osd-actions-grid {

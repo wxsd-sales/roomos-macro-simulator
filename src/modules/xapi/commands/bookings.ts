@@ -1,4 +1,10 @@
-import type { AddLog, Booking, DeviceState } from "../../types.ts";
+import {
+  formatBookingTime,
+  getCurrentBooking,
+  getNextBooking,
+  resolveRoomAvailability,
+} from "../../bookings/availability.ts";
+import type { AddLog, Booking, DeviceState, RenderDevice } from "../../types.ts";
 
 type XapiPayload = Record<string, unknown>;
 type EmitEvent = (path: string, payload: unknown) => void;
@@ -9,6 +15,8 @@ interface CreateBookingsHandlerOptions {
   addLog: AddLog;
   emitEvent: EmitEvent;
   publishStatus: PublishStatus;
+  /** Lifecycle timers fire outside any command, so they must request their own render. */
+  renderDevice?: RenderDevice;
 }
 
 function toPayload(value: unknown): XapiPayload {
@@ -62,28 +70,6 @@ function getBookingPayload(booking: Booking): Record<string, unknown> {
   };
 }
 
-function getCurrentBooking(device: DeviceState, now = new Date()): Booking | null {
-  return (
-    device.bookings.find((booking) => {
-      if (booking.state === "ended") {
-        return false;
-      }
-
-      const start = new Date(booking.startTime);
-      const end = new Date(booking.endTime);
-      return start <= now && end > now;
-    }) ?? null
-  );
-}
-
-function getNextBooking(device: DeviceState, now = new Date()): Booking | null {
-  return (
-    device.bookings
-      .filter((booking) => booking.state !== "ended" && new Date(booking.startTime) > now)
-      .sort((first, second) => new Date(first.startTime).getTime() - new Date(second.startTime).getTime())[0] ?? null
-  );
-}
-
 function schedule(callback: () => void, delayMs: number): void {
   const timer = setTimeout(callback, Math.max(0, delayMs));
   const nodeTimer = timer as unknown as { unref?: () => void };
@@ -95,25 +81,26 @@ export function createBookingsCommandHandler({
   addLog,
   emitEvent,
   publishStatus,
+  renderDevice,
 }: CreateBookingsHandlerOptions) {
   function publishAvailability(): void {
-    const currentBooking = getCurrentBooking(device);
+    const currentBooking = getCurrentBooking(device.bookings);
     publishStatus(AVAILABILITY_STATUS_PATH, currentBooking ? "Busy" : "Available");
     publishStatus(AVAILABILITY_TIMESTAMP_PATH, new Date().toISOString());
   }
 
   function updateSchedulerFromBookings(): void {
-    const currentBooking = getCurrentBooking(device);
-    const nextBooking = getNextBooking(device);
+    const availability = resolveRoomAvailability(device.bookings);
+    const nextMeeting = getNextBooking(device.bookings)?.title ?? "Not scheduled";
 
-    if (currentBooking) {
+    if (availability.current) {
       device.scheduler = {
         ...device.scheduler,
         busy: true,
-        title: currentBooking.title,
+        title: availability.current.title,
         subtitle: "Meeting in progress",
-        nextMeeting: nextBooking?.title ?? "Not scheduled",
-        presenter: currentBooking.organizerName,
+        nextMeeting,
+        presenter: availability.current.organizerName,
         progress: 0,
       };
       return;
@@ -122,12 +109,18 @@ export function createBookingsCommandHandler({
     device.scheduler = {
       ...device.scheduler,
       busy: false,
-      title: "Focus Room 3A",
-      subtitle: "No active booking",
-      nextMeeting: nextBooking?.title ?? "Not scheduled",
-      presenter: "Awaiting macro input",
+      title: availability.headline,
+      subtitle: availability.next ? `Next: ${availability.next.title}` : "No active booking",
+      nextMeeting,
+      presenter: availability.next?.organizerName ?? "Awaiting macro input",
       progress: 0,
     };
+  }
+
+  /** Keeps derived scheduler state and the React tree in step after any change. */
+  function refresh(): void {
+    updateSchedulerFromBookings();
+    publishAvailability();
   }
 
   function startBooking(booking: Booking): void {
@@ -136,10 +129,10 @@ export function createBookingsCommandHandler({
     }
 
     booking.state = "started";
-    updateSchedulerFromBookings();
-    publishAvailability();
+    refresh();
     emitEvent("Bookings.Start", getBookingPayload(booking));
     addLog(`Booking started: ${booking.title}`, "success");
+    renderDevice?.();
   }
 
   function endBooking(booking: Booking): void {
@@ -148,10 +141,10 @@ export function createBookingsCommandHandler({
     }
 
     booking.state = "ended";
-    updateSchedulerFromBookings();
-    publishAvailability();
+    refresh();
     emitEvent("Bookings.End", getBookingPayload(booking));
     addLog(`Booking ended: ${booking.title}`, "success");
+    renderDevice?.();
   }
 
   function scheduleBookingLifecycle(booking: Booking): void {
@@ -195,9 +188,11 @@ export function createBookingsCommandHandler({
       (first, second) => new Date(first.startTime).getTime() - new Date(second.startTime).getTime(),
     );
 
-    addLog(`Booked ${booking.title} until ${end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`, "success");
+    addLog(`Booked ${booking.title} until ${formatBookingTime(booking.endTime)}.`, "success");
     scheduleBookingLifecycle(booking);
-    publishAvailability();
+    // Refresh even when the booking starts later, so the surfaces can show
+    // "Available until <start>" straight away.
+    refresh();
 
     return getBookingPayload(booking);
   }
@@ -222,7 +217,7 @@ export function createBookingsCommandHandler({
   function getStatus(path: string): unknown {
     switch (path) {
       case AVAILABILITY_STATUS_PATH:
-        return getCurrentBooking(device) ? "Busy" : "Available";
+        return getCurrentBooking(device.bookings) ? "Busy" : "Available";
       case AVAILABILITY_TIMESTAMP_PATH:
         return new Date().toISOString();
       default:

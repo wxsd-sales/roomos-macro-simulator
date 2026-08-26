@@ -2,7 +2,7 @@ import { createDefaultMeetingState } from "../meetings/providers.ts";
 import type { DeviceRuntime, DeviceState, DeviceStateOverrides } from "../types.ts";
 
 export function createDefaultDeviceState(overrides: DeviceStateOverrides = {}): DeviceState {
-  const { meeting, scheduler, ...deviceOverrides } = overrides;
+  const { meeting, scheduler, call, ...deviceOverrides } = overrides;
 
   return {
     alert: null,
@@ -10,8 +10,14 @@ export function createDefaultDeviceState(overrides: DeviceStateOverrides = {}): 
     activePanel: "Home",
     workspaceName: "Workspace Name",
     bookings: [],
+    config: {},
     ...deviceOverrides,
     meeting: createDefaultMeetingState(meeting),
+    call: {
+      active: false,
+      remoteNumber: "",
+      ...call,
+    },
     scheduler: {
       busy: false,
       title: "Focus Room 3A",

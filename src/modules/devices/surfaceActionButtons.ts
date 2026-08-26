@@ -43,9 +43,18 @@ export type ResolvedActionIcon =
   | { type: "brand"; brand: BrandIcon }
   | { type: "customImage"; url: string };
 
-export const OSD_NATIVE_ACTIONS: SurfaceAction[] = [
+interface NativeSurfaceAction extends SurfaceAction {
+  /** Whiteboarding needs a touch screen, so it never reaches the Controller. */
+  osdOnly?: boolean;
+}
+
+/**
+ * The OSD and the Controller offer the same native buttons. Only whiteboarding
+ * is OSD-only, because it requires an interactive (touch) display.
+ */
+const NATIVE_ACTIONS: NativeSurfaceAction[] = [
   { id: "native-call", label: "Call", activityType: "Call" },
-  { id: "native-whiteboard", label: "Whiteboard", activityType: "Whiteboard" },
+  { id: "native-whiteboard", label: "Whiteboard", activityType: "Whiteboard", osdOnly: true },
   { id: "native-share", label: "Share", activityType: "Share" },
   { id: "native-webex", label: "Webex", activityType: "Webex" },
   { id: "native-zoom", label: "Zoom", activityType: "Zoom" },
@@ -53,12 +62,15 @@ export const OSD_NATIVE_ACTIONS: SurfaceAction[] = [
   { id: "native-google-meet", label: "Google Meet", activityType: "GoogleMeet" },
 ];
 
-export const CONTROLLER_NATIVE_ACTIONS: SurfaceAction[] = [
-  { id: "native-call", label: "Call", activityType: "Call" },
-  { id: "native-share", label: "Share", activityType: "Share" },
-  { id: "native-webex", label: "Webex", activityType: "Webex" },
-  { id: "native-zoom", label: "Zoom", activityType: "Zoom" },
-];
+function toSurfaceActions(actions: NativeSurfaceAction[]): SurfaceAction[] {
+  return actions.map(({ id, label, activityType }) => ({ id, label, activityType }));
+}
+
+export const OSD_NATIVE_ACTIONS: SurfaceAction[] = toSurfaceActions(NATIVE_ACTIONS);
+
+export const CONTROLLER_NATIVE_ACTIONS: SurfaceAction[] = toSurfaceActions(
+  NATIVE_ACTIONS.filter((action) => !action.osdOnly),
+);
 
 const NATIVE_ICON_CLASSES: Record<string, string> = {
   call: "icon-camera-filled",

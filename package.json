@@ -5,6 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "schema:update": "tsx scripts/update-xapi-schema.mts",
     "screenshot:readme": "tsx scripts/capture-readme-screenshot.mts",
     "test:e2e:install": "playwright install",
     "test": "vitest run",

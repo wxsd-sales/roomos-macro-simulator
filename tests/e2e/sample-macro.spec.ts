@@ -15,6 +15,46 @@ test("sample macro loads into the file list and editor", async ({ page }) => {
   await expect(editor.getByText("xapi.Command.UserInterface.Message.Alert.Display({")).toBeVisible();
 });
 
+test("editor autocompletes every xapi root without an import statement", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(
+    page.locator(".log-line", { hasText: "Loaded xapi IntelliSense schema" }),
+  ).toBeVisible();
+
+  const editor = page.getByRole("textbox", { name: "Editor content" });
+  const suggestions = page.locator(".suggest-widget .monaco-list-row");
+
+  const suggestionLabels = async () =>
+    (await suggestions.allInnerTexts()).map((label) => label.trim());
+
+  // The sample macro's `import xapi from 'xapi'` is replaced, so these
+  // completions can only come from the ambient global declaration. The suggest
+  // widget virtualizes its rows, so each source types enough of the member name
+  // to narrow the list to something fully rendered.
+  for (const [expression, expected] of [
+    ["xapi.", ["Command", "Status", "Config", "Event"]],
+    ["xapi.Command.UserInt", ["UserInterface"]],
+    ["xapi.Command.Audio.Volume.S", ["Set"]],
+    ["xapi.Status.Standby.Stat", ["State"]],
+    ["xapi.Status.Standby.State.", ["get", "on", "off"]],
+    ["xapi.Config.Audio.DefaultVol", ["DefaultVolume"]],
+    ["xapi.Config.Audio.DefaultVolume.", ["get", "set", "on"]],
+    ["xapi.Event.UserInterface.Ext", ["Extensions"]],
+  ] as const) {
+    await editor.focus();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type(expression);
+
+    await expect(suggestions.first()).toBeVisible();
+    await expect
+      .poll(suggestionLabels)
+      .toEqual(expect.arrayContaining(expected.map((label) => expect.stringContaining(label))));
+
+    await page.keyboard.press("Escape");
+  }
+});
+
 test("navigator footer shows the app major version", async ({ page }) => {
   await page.goto("/");
 
@@ -66,7 +106,6 @@ test("osd native calling buttons use local brand icons", async ({ page }) => {
 
   const expectedBrandButtons = [
     ["native-webex", "Webex"],
-    ["native-zoom", "Zoom"],
     ["native-microsoft-teams", "Microsoft Teams"],
     ["native-google-meet", "Google Meet"],
   ];
@@ -79,6 +118,47 @@ test("osd native calling buttons use local brand icons", async ({ page }) => {
     await expect(tile.locator(".osd-action-label")).toHaveText(label);
     await expect(tile.locator(`img[data-brand-icon="${label}"]`)).toBeVisible();
   }
+});
+
+test("osd and controller share their native buttons except whiteboarding", async ({ page }) => {
+  await page.goto("/");
+
+  const nativeIds = (attribute: string) =>
+    page.locator(`[${attribute}^="native-"]`).evaluateAll((nodes, name) =>
+      nodes.map((node) => node.getAttribute(name) ?? ""), attribute);
+
+  await expect(page.locator('[data-osd-action="native-whiteboard"]')).toBeVisible();
+
+  const osdIds = await nativeIds("data-osd-action");
+  const controllerIds = await nativeIds("data-controller-action");
+
+  expect(controllerIds).toEqual(osdIds.filter((id) => id !== "native-whiteboard"));
+});
+
+test("UserInterface Features configuration shows and hides native buttons", async ({ page }) => {
+  await page.goto("/");
+
+  const callButton = page.locator('[data-osd-action="native-call"]');
+  const zoomButton = page.locator('[data-osd-action="native-zoom"]');
+
+  // The schema ships Call JoinZoom as Hidden, so Zoom starts off screen.
+  await expect(callButton).toBeVisible();
+  await expect(zoomButton).toHaveCount(0);
+
+  await page.getByRole("textbox", { name: "Editor content" }).focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(
+    [
+      "xapi.Config.UserInterface.Features.Call.Start.set('Hidden');",
+      "xapi.Config.UserInterface.Features.Call.JoinZoom.set('Auto');",
+    ].join("\n"),
+  );
+  await page.locator("#run-button").click();
+
+  await expect(callButton).toHaveCount(0);
+  await expect(zoomButton).toBeVisible();
+  await expect(page.locator('[data-controller-action="native-call"]')).toHaveCount(0);
+  await expect(page.locator('[data-controller-action="native-zoom"]')).toBeVisible();
 });
 
 test("device action buttons and edge handles share the same control surface style", async ({ page }) => {

@@ -1,5 +1,10 @@
 import type { AddLog, DevicePanel, DeviceState } from "../../../../types.ts";
 import { normalizeCustomIconDataUri } from "../../../../devices/customIconData.ts";
+import {
+  DEFAULT_PANEL_LOCATION,
+  normalizePanelLocation,
+  PANEL_LOCATIONS,
+} from "../../../../devices/panelLocations.ts";
 
 type XapiPayload = Record<string, unknown>;
 type EmitEvent = (path: string, payload: unknown) => void;
@@ -144,6 +149,7 @@ function createPanelFromXml({
   index,
   existingCount,
   customIconInput,
+  addLog,
 }: {
   payload: XapiPayload;
   parsedPanel: ParsedPanel;
@@ -151,6 +157,7 @@ function createPanelFromXml({
   index: number;
   existingCount: number;
   customIconInput: { content?: unknown; id?: unknown };
+  addLog: AddLog;
 }): DevicePanel {
   const id = toStringValue(
     parsedPanel.id ?? payload.PanelId ?? payload.PanelID ?? payload.Id,
@@ -159,12 +166,24 @@ function createPanelFromXml({
   const customIconDataUri = normalizeCustomIconDataUri(customIconInput.content ?? parsedPanel.customIconDataUri);
   const customIconId = toStringValue(customIconInput.id ?? parsedPanel.customIconId);
 
+  // Store the canonical location so the surfaces can filter on it directly.
+  const requestedLocation = toStringValue(payload.Location ?? parsedPanel.location);
+  const location = normalizePanelLocation(requestedLocation) ?? DEFAULT_PANEL_LOCATION;
+  if (requestedLocation && location !== requestedLocation) {
+    addLog(
+      normalizePanelLocation(requestedLocation)
+        ? `Panel ${id} location "${requestedLocation}" normalized to ${location}.`
+        : `Panel ${id} has unknown location "${requestedLocation}". Falling back to ${location}. Valid locations: ${PANEL_LOCATIONS.join(", ")}.`,
+      normalizePanelLocation(requestedLocation) ? "info" : "warn",
+    );
+  }
+
   return {
     id,
     name: toStringValue(payload.Name ?? parsedPanel.name, id),
     activityType: toStringValue(payload.ActivityType ?? parsedPanel.activityType, "Custom"),
     icon: toStringValue(payload.Icon ?? parsedPanel.icon),
-    location: toStringValue(payload.Location ?? parsedPanel.location, "HomeScreen"),
+    location,
     customIconDataUri,
     customIconId: customIconId || undefined,
     rawXml,
@@ -208,6 +227,7 @@ export function createPanelCommandHandler({
         index,
         existingCount: device.panels.length,
         customIconInput,
+        addLog,
       }),
     );
 
