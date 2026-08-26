@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { DeviceState } from "../../../modules/types.ts";
+import type { DeviceState, DeviceSurface } from "../../../modules/types.ts";
 import {
   describeBookingTiming,
   formatBookingRange,
@@ -17,7 +17,7 @@ import { RoundActionButton } from "./RoundActionButton.tsx";
 
 interface ControllerSurfaceProps {
   device: DeviceState;
-  onSelectPanel(panelId: string): void;
+  onSelectPanel(panelId: string, surface: DeviceSurface): void;
   onDismissAlert(): void;
 }
 
@@ -130,7 +130,7 @@ export function ControllerSurface({ device, onSelectPanel, onDismissAlert }: Con
                       imageClass="controller-action-image"
                       brandImageClass="controller-brand-action-image"
                       customImageClass="surface-custom-action-image"
-                      onClick={() => onSelectPanel(action.id)}
+                      onClick={() => onSelectPanel(action.id, "controller")}
                     />
                   );
                 })}

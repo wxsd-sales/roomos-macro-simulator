@@ -39,6 +39,19 @@ export function getPanelLocation(panel: DevicePanel): PanelLocation {
   return normalizePanelLocation(panel.location) ?? DEFAULT_PANEL_LOCATION;
 }
 
+/** The `Origin` values a `Panel.Clicked` event can report. */
+export type PanelClickOrigin = "OSD" | "Controller" | "RoomScheduler";
+
+const CLICK_ORIGINS_BY_SURFACE: Record<DeviceSurface, PanelClickOrigin> = {
+  osd: "OSD",
+  controller: "Controller",
+  scheduler: "RoomScheduler",
+};
+
+export function getPanelClickOrigin(surface: DeviceSurface): PanelClickOrigin {
+  return CLICK_ORIGINS_BY_SURFACE[surface];
+}
+
 interface PanelVisibilityContext {
   /** Home-screen panels hide during a call; call-control panels only show in one. */
   inCall: boolean;

@@ -94,16 +94,22 @@ describe("xapi user interface extension panel facade", () => {
 
     await xapi.Command.UserInterface.Extensions.Panel.Clicked({
       PanelId: "lights",
-      Origin: "local",
+      Origin: "Controller",
       PeripheralId: "controller",
     });
     expect(clickedEvents).toEqual([
       {
         PanelId: "lights",
-        Origin: "local",
+        Origin: "Controller",
         PeripheralId: "controller",
       },
     ]);
+
+    await xapi.Command.UserInterface.Extensions.Panel.Clicked({ PanelId: "lights" });
+    expect(clickedEvents[1]).toEqual({
+      PanelId: "lights",
+      PeripheralId: "",
+    });
 
     await xapi.Command.UserInterface.Extensions.Panel.Open({ PanelId: "lights" });
     expect(device.activePanel).toBe("lights");

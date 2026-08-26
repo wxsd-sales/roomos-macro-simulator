@@ -43,7 +43,7 @@ export function DeviceSimulator() {
     <div id="device-render-root" className="device-render-root">
       <DeviceStack
         device={state.device}
-        onSelectPanel={(panelId) => registerDeviceHost.handleSelectPanel(panelId)}
+        onSelectPanel={(panelId, surface) => registerDeviceHost.handleSelectPanel(panelId, surface)}
         onDismissAlert={() => registerDeviceHost.handleDismissAlert()}
       />
     </div>

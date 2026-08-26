@@ -201,9 +201,12 @@ function upsertPanel(device: DeviceState, panel: DevicePanel): void {
 }
 
 function getPanelEventPayload(payload: XapiPayload, panelId: string): Record<string, unknown> {
+  // Origin is optional on the event, and only OSD, Controller and
+  // RoomScheduler are valid, so leave it out when the caller omitted it.
+  const origin = toStringValue(payload.Origin);
   return {
     PanelId: panelId,
-    Origin: payload.Origin ?? "local",
+    ...(origin ? { Origin: origin } : {}),
     PeripheralId: payload.PeripheralId ?? "",
   };
 }

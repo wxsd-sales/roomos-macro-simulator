@@ -252,6 +252,31 @@ test("device alerts use OSD toast and controller modal presentations", async ({ 
   });
 });
 
+test("clicking the sample Toggle Lights panel shows an alert", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#run-button").click();
+
+  // The macro opens with a welcome alert, which the controller shows as a modal.
+  const dismissAlert = () =>
+    page.locator(".controller-alert-card").getByRole("button", { name: "Dismiss" }).click();
+  await dismissAlert();
+
+  for (const surface of ["controller", "osd"]) {
+    const lightsButton = page.locator(`[data-${surface}-action="lights"]`);
+    await expect(lightsButton).toBeVisible();
+    await lightsButton.click();
+
+    await expect(page.locator("[data-alert-layer]")).toBeVisible();
+    await expect(page.locator("[data-alert-title]")).toHaveText("Toggle Lights");
+    await expect(page.locator("[data-alert-text]")).toHaveText("The room lights were toggled.");
+    await dismissAlert();
+  }
+
+  // A click carries the surface as its Origin, so nothing fails schema validation.
+  await expect(page.locator(".log-line.error")).toHaveCount(0);
+  await expect(page.locator(".log-line", { hasText: "Clicked panel lights" })).toHaveCount(2);
+});
+
 test("theme selector defaults to system and switches the app and editor themes", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

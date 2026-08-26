@@ -41,6 +41,10 @@ xapi.Event.UserInterface.Extensions.Panel.Clicked.on(event => {
   const { PanelId, Origin, PeripheralId } = event; 
   if( PanelId != 'lights' ) return
   console.log('Toggling Lights');
+  xapi.Command.UserInterface.Message.Alert.Display({
+    Title: 'Toggle Lights',
+    Text: 'The room lights were toggled.',
+  });
 });
 
 

@@ -1,11 +1,11 @@
-import type { DeviceState } from "../../../modules/types.ts";
+import type { DeviceState, DeviceSurface } from "../../../modules/types.ts";
 import { ControllerSurface } from "./ControllerSurface.tsx";
 import { OsdSurface } from "./OsdSurface.tsx";
 import { SchedulerSurface } from "./SchedulerSurface.tsx";
 
 interface DeviceStackProps {
   device: DeviceState;
-  onSelectPanel(panelId: string): void;
+  onSelectPanel(panelId: string, surface: DeviceSurface): void;
   onDismissAlert(): void;
 }
 

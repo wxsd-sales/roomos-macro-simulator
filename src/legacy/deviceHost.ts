@@ -1,6 +1,7 @@
 import { createDeviceActions } from "../modules/app/index.ts";
+import { getPanelClickOrigin } from "../modules/devices/panelLocations.ts";
 import { applyUiFeatureDefaults } from "../modules/devices/uiFeatures.ts";
-import type { DevicePanel, DeviceState } from "../modules/types.ts";
+import type { DevicePanel, DeviceState, DeviceSurface } from "../modules/types.ts";
 import { onXapiSchemaReady } from "./monacoHost.ts";
 import type { AppStoreBridge } from "../features/app/appStoreBridge.ts";
 import { simulatorDeviceRuntime } from "../features/app/simulatorDevice.ts";
@@ -36,7 +37,7 @@ function getExtensionPanelById(panelId: string): DevicePanel | null {
   return device.panels.find((panel) => panel.id === panelId || panel.name === panelId) ?? null;
 }
 
-function emitPanelClicked(panelId: string): void {
+function emitPanelClicked(panelId: string, surface: DeviceSurface): void {
   const panel = getExtensionPanelById(panelId);
   if (!panel || !activeXapiFacade) {
     return;
@@ -44,7 +45,7 @@ function emitPanelClicked(panelId: string): void {
 
   activeXapiFacade.command("UserInterface.Extensions.Panel.Clicked", {
     PanelId: panel.id,
-    Origin: "local",
+    Origin: getPanelClickOrigin(surface),
     PeripheralId: "simulator",
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -52,9 +53,9 @@ function emitPanelClicked(panelId: string): void {
   });
 }
 
-function handleDevicePanelSelection(panelId: string): void {
+function handleDevicePanelSelection(panelId: string, surface: DeviceSurface): void {
   deviceActions?.selectPanel(panelId);
-  emitPanelClicked(panelId);
+  emitPanelClicked(panelId, surface);
 }
 
 function renderFromRuntime(): void {
@@ -98,8 +99,8 @@ export const registerDeviceHost = {
     renderFromRuntime();
   },
 
-  handleSelectPanel(panelId: string): void {
-    handleDevicePanelSelection(panelId);
+  handleSelectPanel(panelId: string, surface: DeviceSurface): void {
+    handleDevicePanelSelection(panelId, surface);
   },
 
   handleDismissAlert(): void {
